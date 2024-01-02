@@ -1,0 +1,7 @@
+global:
+  # Your global configuration options go here...
+
+scrape_configs:
+  - job_name: 'static_targets'
+    static_configs:
+      - targets: ['kafka-overwatch:8000']

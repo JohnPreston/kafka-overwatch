@@ -1,0 +1,39 @@
+---
+# Local testing Kafka configuration
+
+clusters:
+  test-simple: # defaults filters out internal topics
+    cluster_config:
+      bootstrap.servers: broker:29092
+      client.id: kafka-overwatch.test-simple
+    topic_exclude_regexes:
+      - ^_(.*)$
+    x-test: whatever
+    reporting_config:
+      local: ./generated_reports
+      evaluation_period_in_seconds: 120
+      S3:
+        BucketName: usera-sftp
+        PrefixKey: kafka-overwatch/reports
+
+  test-exclude: # testing to exclude topics
+    cluster_config:
+      bootstrap.servers: broker:29092
+      client.id: kafka-overwatch.test-exclude
+    topic_exclude_regexes:
+      - ^test(.*)$
+    reporting_config:
+      local: ./generated_reports
+      evaluation_period_in_seconds: 60
+
+
+  test-include: # show me only include topics, using default exclude rules
+    cluster_config:
+      bootstrap.servers: broker:29092
+      client.id: kafka-overwatch.test-include
+    topic_include_regexes:
+      - '^_(.*)$'
+      - '^test(.*)'
+    reporting_config:
+      local: ./generated_reports
+      evaluation_period_in_seconds: 300

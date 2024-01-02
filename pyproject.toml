@@ -1,0 +1,109 @@
+[tool.poetry]
+name = "kafka-overwatch"
+version = "0.0.1"
+description = "Continuously monitors Kafka cluster topics & consumer groups"
+authors = ["John \"Preston\" Mille <john@ews-network.net>"]
+maintainers = ["John \"Preston\" Mille <john@ews-network.net>"]
+readme = "README.rst"
+license = "MPL-2.0"
+keywords = ["kafka", "monitoring", "reporting", "usage-analysis", "cost-savings"]
+
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Intended Audience :: System Administrators",
+  "Intended Audience :: Information Technology",
+  "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
+  "Natural Language :: English",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+]
+include = ["LICENSE", "kafka_overwatch/**/*.json"]
+exclude = ["*.pyc", "*~", "*pycache*"]
+
+[tool.poetry.urls]
+"Bug Tracker" = "https://github.com/JohnPreston/kafka-overwatch/issues"
+
+
+[tool.poetry.dependencies]
+python = "^3.9"
+confluent-kafka = "^2.3.0"
+compose-x-common = "^1.4.3"
+boto3 = ">=1.34,<2.0"
+dacite = "^1.8.1"
+pyyaml = "^6.0.1"
+aws-cfn-custom-resource-resolve-parser = "^0.3.1"
+retry2 = "^0.9.5"
+jsonschema = "^4.20.0"
+aws-embedded-metrics = "^3.2.0"
+importlib-resources = "^6.1.1"
+prometheus-client = "^0.19.0"
+
+
+[tool.poetry.group.dev.dependencies]
+black = "^23.12"
+isort = "^5.13"
+pyupgrade = "^3.15"
+pre-commit = "^3.6"
+datamodel-code-generator = "^0.25.1"
+pytest = "^7.4"
+testcontainers = "^3.7.1"
+
+[tool.poetry.scripts]
+kafka-overwatch = "kafka_overwatch.cli:main"
+
+[tool.black]
+line-length = 88
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+known_first_party = "kelvin"
+
+[tool.coverage.report]
+exclude_lines = [
+  "if __name__ == '__main__'"
+]
+
+[tool.coverage.run]
+omit = [
+  "*/cli.py"
+]
+
+[tool.tbump]
+github_url = "https://github.com/johnpreston/kafka-overwatch"
+
+[tool.tbump.version]
+current = "0.0.1"
+regex = '''
+  (?P<major>\d+)
+  \.
+  (?P<minor>\d+)
+  \.
+  (?P<patch>\d+)
+  (?:(?P<rc>[\S]+))?
+  '''
+
+[tool.tbump.git]
+message_template = "Bump to {new_version}"
+tag_template = "v{new_version}"
+
+[[tool.tbump.file]]
+src = "pyproject.toml"
+
+[[tool.tbump.file]]
+src = "ecs_composex/__init__.py"
+
+[[tool.tbump.before_commit]]
+name = "Files format"
+cmd = "make conform"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

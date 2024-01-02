@@ -1,0 +1,359 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "id": "input_config.spec.json",
+  "$id": "input_config.spec.json",
+  "title": "Kafka Overwatch Input Configuration",
+  "description": "Specification for Kafka topics/partitions hunter service",
+  "type": "object",
+  "additionalProperties": false,
+  "patternProperties": {
+    "x-": {}
+  },
+  "properties": {
+    "global": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Global settings. Apply to all clusters",
+      "required": [
+        "ClusterScanIntervalInSeconds"
+      ],
+      "properties": {
+        "ClusterScanIntervalInSeconds": {
+          "$ref": "#/definitions/ClusterScanIntervalInSeconds",
+          "default": 60
+        }
+      }
+    },
+    "clusters": {
+      "type": "object",
+      "description": "Kafka clusters to monitor and report on the partitions usage",
+      "additionalProperties": false,
+      "uniqueItems": true,
+      "patternProperties": {
+        "^[a-zA-Z\\d\\-_]+$": {
+          "$ref": "#/definitions/clusterConfiguration"
+        }
+      }
+    },
+    "gateways": {
+      "type": "object",
+      "description": "Gateways to monitor and import the vClusters from the partitions usage",
+      "additionalProperties": false,
+      "uniqueItems": true,
+      "patternProperties": {
+        "^[a-zA-Z\\d\\-_]+$": {
+          "$ref": "#/definitions/gatewayConfiguration"
+        }
+      }
+    },
+    "prometheus": {},
+    "notification_channels": {
+      "$ref": "#/definitions/NotificationChannels"
+    },
+    "aws_emf": {
+      "type": "object",
+      "properties": {
+        "log_group_name": {
+          "type": "string",
+          "description": "override log group name to publish metrics to. Importance: High",
+          "default": "kafka/cluster/overwatch/metrics"
+        },
+        "service_name": {
+          "type": "string",
+          "description": "override value for EMF Service name. Importance: Low"
+        },
+        "watcher_config": {
+          "$ref": "#/definitions/aws_emf"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "aws_emf": {
+      "type": "object",
+      "required": [
+        "namespace"
+      ],
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "high_resolution_metrics": {
+          "type": "boolean",
+          "default": false,
+          "description": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/publishingMetrics.html#high-resolution-metrics"
+        },
+        "dimensions": {
+          "type": "object",
+          "uniqueItems": true,
+          "minProperties": 1,
+          "maxProperties": 25,
+          "description": "Dimension name and value to set in a key/value format.",
+          "patternProperties": {
+            "^\\w+$": {
+              "type": "string",
+              "description": "Value for the given dimension"
+            }
+          }
+        },
+        "enabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "NotificationChannels": {
+      "type": "object",
+      "description": "Channels to send notifications to when reports have been generated.",
+      "additionalProperties": false,
+      "properties": {
+        "sns": {
+          "type": "object",
+          "uniqueItems": true,
+          "patternProperties": {
+            "^[a-zA-Z0-9-_]+$": {
+              "$ref": "#/definitions/SnsTopicChannel"
+            }
+          }
+        }
+      }
+    },
+    "SnsTopicChannel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "topic_arn"
+      ],
+      "properties": {
+        "topic_arn": {
+          "type": "string",
+          "description": "ARN of the SNS topic."
+        },
+        "role_arn": {
+          "type": "string",
+          "description": "Optional - Use IAM role to publish messages using another IAM role"
+        },
+        "ignore_errors": {
+          "type": "boolean",
+          "description": "Prevents exception if true when an exception occurs."
+        },
+        "template": {
+          "type": "object",
+          "description": "Allows to set specific templates for email and sms ",
+          "additionalProperties": false,
+          "properties": {
+            "email": {
+              "type": "string",
+              "description": "Optional - Path to a template for SNS Email messages"
+            },
+            "sms": {
+              "type": "string",
+              "description": "Optional - Path to a template for SNS SMS messages"
+            }
+          }
+        }
+      }
+    },
+    "ClusterMetrics": {
+      "type": "object",
+      "properties": {
+        "prometheus": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
+          }
+        },
+        "aws_emf": {
+          "$ref": "#/definitions/aws_emf"
+        }
+      }
+    },
+    "S3Output": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "BucketName": {
+          "type": "string",
+          "description": "Name of the S3 bucket"
+        },
+        "PrefixKey": {
+          "type": "string",
+          "default": "",
+          "description": "Path in the bucket."
+        },
+        "IamOverride": {
+          "$ref": "#/definitions/IamOverride"
+        }
+      }
+    },
+    "regexes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "ReportingConfig": {
+      "type": "object",
+      "description": "Configure reporting output. Applies to all clusters.",
+      "additionalProperties": false,
+      "properties": {
+        "evaluation_period_in_seconds": {
+          "type": "integer",
+          "minimum": 60,
+          "description": "Time to wait before generating reports",
+          "default": 60
+        },
+        "S3": {
+          "$ref": "#/definitions/S3Output"
+        },
+        "local": {
+          "type": "string",
+          "description": "Local directory to store the reports to.",
+          "default": "/tmp/kafka-overwatch-reports/"
+        },
+        "kafka": {
+          "type": "object",
+          "description": "Configuration to persist reports into Kafka. Not yet implemented."
+        }
+      }
+    },
+    "clusterConfiguration": {
+      "type": "object",
+      "title": "KafkaClusterSettings",
+      "required": [
+        "cluster_config",
+        "reporting_config"
+      ],
+      "properties": {
+        "cluster_scan_interval_in_seconds": {
+          "$ref": "#/definitions/ClusterScanIntervalInSeconds",
+          "description": "Overrides the global setting",
+          "default": 60
+        },
+        "cluster_config": {
+          "type": "object",
+          "description": "Configuration as documented in https://github.com/confluentinc/librdkafka/blob/master/CONFIGURATION.md"
+        },
+        "reporting_config": {
+          "$ref": "#/definitions/ReportingConfig"
+        },
+        "topics_backup_config": {
+          "$ref": "#/definitions/ClusterTopicBackupConfig"
+        },
+        "awareness_topic": {
+          "type": "string",
+          "description": "Name of a topic that the Overwatch will subscribe to. This allows multiple instances of the overwatch to be aware and disable features that shouldn't be distributed",
+          "default": "_overwatchAwareness"
+        },
+        "topic_include_regexes": {
+          "$ref": "#/definitions/regexes"
+        },
+        "topic_exclude_regexes": {
+          "$ref": "#/definitions/regexes"
+        },
+        "metrics": {
+          "description": "Configure metrics export for the cluster",
+          "$ref": "#/definitions/ClusterMetrics"
+        }
+      },
+      "additionalItems": false,
+      "patternProperties": {
+        "x-": {}
+      },
+      "uniqueItems": true
+    },
+    "gatewayConfiguration": {
+      "type": "object",
+      "properties": {
+        "gateway_config": {
+          "type": "object"
+        },
+        "reporting_config": {
+          "$ref": "#/definitions/ReportingConfig"
+        },
+        "topic_include_regexes": {
+          "$ref": "#/definitions/regexes"
+        },
+        "topic_exclude_regexes": {
+          "$ref": "#/definitions/regexes"
+        },
+        "metrics": {
+          "description": "Configure metrics export for the cluster",
+          "$ref": "#/definitions/ClusterMetrics"
+        }
+      },
+      "additionalItems": false,
+      "patternProperties": {
+        "x-": {}
+      },
+      "uniqueItems": true
+    },
+    "ClusterTopicBackupConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable/disable backup of the topics configuration",
+          "default": false
+        },
+        "S3": {
+          "description": "Enables exports to be sent to S3.",
+          "$ref": "#/definitions/S3Output"
+        },
+        "BackupStyles": {
+          "description": "List the types of backups you want to generate.",
+          "default": [
+            "kafka-topics.sh"
+          ],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "cfn-kafka-admin",
+              "kafka-topics.sh"
+            ]
+          }
+        }
+      }
+    },
+    "IamOverride": {
+      "type": "object",
+      "description": "Optional - IAM profile/settings override to use. Defaults to SDK settings.",
+      "properties": {
+        "ProfileName": {
+          "type": "string",
+          "description": "Optional - Use IAM profile to publish messages using another IAM profile"
+        },
+        "AssumeRole": {
+          "type": "object",
+          "required": [
+            "RoleArn"
+          ],
+          "properties": {
+            "RoleArn": {
+              "type": "string",
+              "description": "Optional - IAM Role ARN to assume"
+            },
+            "RoleSessionName": {
+              "type": "string",
+              "description": "Optional - Name of the session to use",
+              "default": "kafka-overwatch@s3"
+            },
+            "ExternalId": {
+              "type": "string",
+              "description": "Optional - External ID to use when assuming a role"
+            }
+          }
+        }
+      }
+    },
+    "ClusterScanIntervalInSeconds": {
+      "type": "integer",
+      "minimum": 10,
+      "maximum": 3600,
+      "description": "Interval, in seconds, to wait between clusters scan."
+    }
+  }
+}

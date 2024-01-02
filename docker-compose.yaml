@@ -1,0 +1,10 @@
+---
+# Kafka Overwatch
+
+services:
+  kafka-overwatch:
+    image: public.ecr.aws/johnpreston/kafka-overwatch
+    build:
+      context: .
+    ports:
+      - 8000:8000/tcp

@@ -1,0 +1,158 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "id": "report_structure.spec.json",
+  "$id": "report_structure.spec.json",
+  "title": "Cluster Usage Report Structure",
+  "description": "Defines the format of the cluster topics report",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "cluster": {
+      "$ref": "#/definitions/ClusterReport"
+    }
+  },
+  "definitions": {
+    "ClusterReport": {
+      "type": "object",
+      "required": [
+        "cluster_name",
+        "topics",
+        "metadata"
+      ],
+      "properties": {
+        "cluster_name": {
+          "type": "string"
+        },
+        "metadata": {
+          "type": "object",
+          "required": [
+            "timestamp"
+          ],
+          "properties": {
+            "timestamp": {
+              "type": "string",
+              "description": "Time the report was generated at"
+            }
+          }
+        },
+        "topics": {
+          "type": "object",
+          "patternProperties": {
+            "^[a-zA-Z0-9\\.\\_\\-]+": {
+              "$ref": "#/definitions/topic"
+            }
+          }
+        },
+        "statistics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "topics"
+          ],
+          "properties": {
+            "topics": {
+              "type": "integer",
+              "description": "Total count of topics counted at the time of generating the report"
+            },
+            "partitions": {
+              "type": "integer",
+              "description": "Sum of partitions for the topics"
+            },
+            "consumer_groups": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "total"
+              ],
+              "properties": {
+                "total": {
+                  "type": "integer",
+                  "description": "Total number of consumer groups"
+                },
+                "active": {
+                  "type": "integer",
+                  "description": "Number of active consumer groups (lag = 0) & members > 0"
+                },
+                "inactive": {
+                  "type": "integer",
+                  "description": "Number of inactive consumer groups (lag > 0) or groups without members"
+                }
+              }
+            }
+          }
+        },
+        "estimated_waste": {
+          "type": "object",
+          "properties": {
+            "topics": {
+              "type": "integer"
+            },
+            "partitions": {
+              "type": "integer",
+              "description": "Sum of partitions for the topics"
+            }
+          }
+        }
+      }
+    },
+    "topic": {
+      "type": "object",
+      "required": [
+        "partitions_count",
+        "new_messages_observed"
+      ],
+      "properties": {
+        "partitions_count": {
+          "type": "integer",
+          "description": "Number of partitions for the topic"
+        },
+        "new_messages_observed": {
+          "type": "object",
+          "required": [
+            "count",
+            "elapsed_time"
+          ],
+          "properties": {
+            "count": {
+              "type": "integer",
+              "description": "Number of new messages observed, as per offset ends changed"
+            },
+            "elapsed_time": {
+              "type": "integer",
+              "description": "Amount of time in seconds passed for the evaluation"
+            }
+          }
+        },
+        "consumption": {
+          "type": "object",
+          "properties": {
+            "active_consumer_groups_count": {
+              "type": "integer",
+              "description": "Number of active consumer groups (lag = 0)"
+            },
+            "inactive_consumer_groups_count": {
+              "type": "integer",
+              "description": "Number of inactive consumer groups (lag > 0) or groups without members"
+            }
+          }
+        },
+        "recommendation": {
+          "type": "object",
+          "properties": {
+            "description": {
+              "type": "string",
+              "description": "Recommendation for the topic"
+            },
+            "suggested_actions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of suggested actions"
+            }
+          }
+        }
+      }
+    }
+  }
+}

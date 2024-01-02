@@ -1,0 +1,106 @@
+---
+services:
+  ecs-local-endpoints:
+    image: amazon/amazon-ecs-local-container-endpoints
+    volumes:
+      - /var/run:/var/run
+      - $HOME/.aws/:/home/.aws/
+    environment:
+      ECS_LOCAL_METADATA_PORT: "51679"
+      HOME: "/home"
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-eu-west-1}
+      AWS_PROFILE: ${AWS_PROFILE:-default}
+    ports:
+      - 51679:51679
+    container_name: ecs-local-endpoints
+
+  kafka-overwatch:
+    image: public.ecr.aws/johnpreston/kafka-overwatch:nightly
+    depends_on:
+      broker:
+        condition: service_started
+      zookeeper:
+        condition: service_started
+      schema-registry:
+        condition: service_started
+      ecs-local-endpoints:
+        condition: service_started
+    volumes:
+      - ./config.local.yaml:/tmp/config.yaml
+    command:
+      - -c
+      - /tmp/config.yaml
+    environment:
+      AWS_CONTAINER_CREDENTIALS_RELATIVE_URI: "/creds"
+      ECS_CONTAINER_METADATA_URI: "http://169.254.170.2/v3"
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    hostname: zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  broker:
+    image: confluentinc/cp-kafka:7.5.0
+    hostname: broker
+    container_name: broker
+    depends_on:
+      - zookeeper
+    ports:
+      - "29092:29092"
+      - "9092:9092"
+      - "9101:9101"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_JMX_PORT: 9101
+      KAFKA_JMX_HOSTNAME: localhost
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.5.0
+    hostname: schema-registry
+    container_name: schema-registry
+    depends_on:
+      broker:
+        condition: service_started
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'broker:29092'
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+
+  prometheus:
+    ports:
+      - 9090:9090/tcp
+    image: prom/prometheus
+    volumes:
+      - ./prometheus.local.yaml:/etc/prometheus/prometheus.yml
+    depends_on:
+      kafka-overwatch:
+        condition: service_started
+
+  grafana:
+    image: grafana/grafana-enterprise
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    volumes:
+      - grafana-storage:/var/lib/grafana
+    depends_on:
+      prometheus:
+        condition: service_started
+
+volumes:
+  grafana-storage: { }

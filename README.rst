@@ -30,10 +30,11 @@ Features
     * Partitions count
     * Number of new messages (measured with topic offsets)
 
+* AWS Secret integration for client config values
+
 Upcoming
 ----------
 
-* AWS Secret integration for client config values
 * Schema Registry integration
 * Multi-nodes awareness (split the load with multiple nodes)
 * `cfn-kafka-admin`_ output format

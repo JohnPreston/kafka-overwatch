@@ -20,6 +20,7 @@ import signal
 from datetime import datetime as dt
 from datetime import timedelta as td
 
+from confluent_kafka.admin import KafkaError
 from prometheus_client import Gauge, Summary
 from retry import retry
 
@@ -110,12 +111,28 @@ class KafkaCluster:
         self.admin_client: AdminClient = None
         self.consumer_client: Consumer = None
         self.set_cluster_connections()
+        self.cluster_brokers_count: int = 0
+        self.set_cluster_properties()
 
     @retry(tries=5)
     def set_cluster_connections(self) -> None:
         client_config = eval_kafka_client_config(self)
         self.admin_client: AdminClient = get_admin_client(client_config)
         self.consumer_client: Consumer = get_consumer_client(client_config)
+
+    @retry(tries=2)
+    def set_cluster_properties(self) -> None:
+        try:
+            cluster = self.admin_client.describe_cluster(
+                include_authorized_operations=True
+            )
+        except KafkaError:
+            cluster = self.admin_client.describe_cluster(
+                include_authorized_operations=False
+            )
+        while not cluster.done():
+            pass
+        self.cluster_brokers_count = len(cluster.result().nodes)
 
     @property
     def config(self) -> ClusterConfiguration:

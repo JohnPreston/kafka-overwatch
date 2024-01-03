@@ -116,7 +116,7 @@ def describe_update_topics(cluster: KafkaCluster, desc_topics: dict) -> None:
     if cluster.topics_watermarks_queue.qsize() == 0:
         return
     topics_watermark_threads: list[threading.Thread] = []
-    for _ in range(NUM_THREADS):
+    for _ in range(1, cluster.cluster_brokers_count or NUM_THREADS):
         _thread = threading.Thread(
             target=init_set_partitions,
             daemon=True,

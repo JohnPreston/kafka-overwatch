@@ -85,7 +85,7 @@ def set_update_cluster_consumer_groups(
         KAFKA_LOG.info(f"{kafka_cluster.name}: no consumer group to describe in queue.")
         return
 
-    for _ in range(NUM_THREADS):
+    for _ in range(1, kafka_cluster.cluster_brokers_count or NUM_THREADS):
         _thread = Thread(
             target=describe_update_consumer_groups,
             daemon=True,

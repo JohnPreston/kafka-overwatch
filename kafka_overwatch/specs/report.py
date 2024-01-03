@@ -21,11 +21,11 @@ class ConsumerGroups:
     """
     Total number of consumer groups
     """
-    active: int | None = None
+    active: Optional[int] = None
     """
     Number of active consumer groups (lag = 0) & members > 0
     """
-    inactive: int | None = None
+    inactive: Optional[int] = None
     """
     Number of inactive consumer groups (lag > 0) or groups without members
     """
@@ -37,17 +37,17 @@ class Statistics:
     """
     Total count of topics counted at the time of generating the report
     """
-    partitions: int | None = None
+    partitions: Optional[int] = None
     """
     Sum of partitions for the topics
     """
-    consumer_groups: ConsumerGroups | None = None
+    consumer_groups: Optional[ConsumerGroups] = None
 
 
 @dataclass
 class EstimatedWaste:
-    topics: int | None = None
-    partitions: int | None = None
+    topics: Optional[int] = None
+    partitions: Optional[int] = None
     """
     Sum of partitions for the topics
     """
@@ -67,11 +67,11 @@ class NewMessagesObserved:
 
 @dataclass
 class Consumption:
-    active_consumer_groups_count: int | None = None
+    active_consumer_groups_count: Optional[int] = None
     """
     Number of active consumer groups (lag = 0)
     """
-    inactive_consumer_groups_count: int | None = None
+    inactive_consumer_groups_count: Optional[int] = None
     """
     Number of inactive consumer groups (lag > 0) or groups without members
     """
@@ -79,11 +79,11 @@ class Consumption:
 
 @dataclass
 class Recommendation:
-    description: str | None = None
+    description: Optional[str] = None
     """
     Recommendation for the topic
     """
-    suggested_actions: list[str] | None = None
+    suggested_actions: Optional[List[str]] = None
     """
     List of suggested actions
     """
@@ -96,17 +96,17 @@ class Topic:
     Number of partitions for the topic
     """
     new_messages_observed: NewMessagesObserved
-    consumption: Consumption | None = None
-    recommendation: Recommendation | None = None
+    consumption: Optional[Consumption] = None
+    recommendation: Optional[Recommendation] = None
 
 
 @dataclass
 class ClusterReport:
     cluster_name: str
     metadata: Metadata
-    topics: dict[str, Topic]
-    statistics: Statistics | None = None
-    estimated_waste: EstimatedWaste | None = None
+    topics: Dict[str, Topic]
+    statistics: Optional[Statistics] = None
+    estimated_waste: Optional[EstimatedWaste] = None
 
 
 @dataclass
@@ -115,4 +115,4 @@ class ClusterUsageReportStructure:
     Defines the format of the cluster topics report
     """
 
-    cluster: ClusterReport | None = None
+    cluster: Optional[ClusterReport] = None

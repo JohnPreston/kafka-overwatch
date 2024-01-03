@@ -233,7 +233,25 @@
         },
         "cluster_config": {
           "type": "object",
-          "description": "Configuration as documented in https://github.com/confluentinc/librdkafka/blob/master/CONFIGURATION.md"
+          "required": [
+            "kafka"
+          ],
+          "properties": {
+            "kafka": {
+              "type": "object",
+              "description": "Configuration as documented in https://github.com/confluentinc/librdkafka/blob/master/CONFIGURATION.md"
+            },
+            "cluster_config_auth": {
+              "type": "object",
+              "description": "Allows to set override configuration for secret values interpolation",
+              "additionalProperties": false,
+              "properties": {
+                "iam_override": {
+                  "$ref": "#/definitions/IamOverride"
+                }
+              }
+            }
+          }
         },
         "reporting_config": {
           "$ref": "#/definitions/ReportingConfig"
@@ -339,7 +357,7 @@
             "RoleSessionName": {
               "type": "string",
               "description": "Optional - Name of the session to use",
-              "default": "kafka-overwatch@s3"
+              "default": "kafka-overwatch@aws"
             },
             "ExternalId": {
               "type": "string",

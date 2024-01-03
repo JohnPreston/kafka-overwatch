@@ -109,12 +109,12 @@ def describe_update_topics(cluster: KafkaCluster, desc_topics: dict) -> None:
         cluster.topics_watermarks_queue.put(
             [_topic_obj, cluster.consumer_client, _topic, dt.utcnow()], False
         )
-    if cluster.topics_watermarks_queue.qsize() == 0:
-        KAFKA_LOG.info(f"No jobs to do. Move on {cluster.name}")
-        return
     KAFKA_LOG.info(
-        f"{cluster.name} - {cluster.topics_watermarks_queue.qsize()} jobs to do. {desc_topics.keys()}"
+        f"{cluster.name} - {cluster.topics_watermarks_queue.qsize()} topic jobs to do."
     )
+    KAFKA_LOG.debug(desc_topics.keys())
+    if cluster.topics_watermarks_queue.qsize() == 0:
+        return
     topics_watermark_threads: list[threading.Thread] = []
     for _ in range(NUM_THREADS):
         _thread = threading.Thread(

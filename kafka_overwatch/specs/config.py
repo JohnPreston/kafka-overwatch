@@ -11,15 +11,15 @@ from typing import Any, Dict, List, Optional
 @dataclass
 class AwsEmf:
     namespace: str
-    high_resolution_metrics: Optional[bool] = False
+    high_resolution_metrics: bool | None = False
     """
     https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/publishingMetrics.html#high-resolution-metrics
     """
-    dimensions: Optional[Dict[str, str]] = None
+    dimensions: dict[str, str] | None = None
     """
     Dimension name and value to set in a key/value format.
     """
-    enabled: Optional[bool] = None
+    enabled: bool | None = None
 
 
 @dataclass
@@ -28,11 +28,11 @@ class Template:
     Allows to set specific templates for email and sms
     """
 
-    email: Optional[str] = None
+    email: str | None = None
     """
     Optional - Path to a template for SNS Email messages
     """
-    sms: Optional[str] = None
+    sms: str | None = None
     """
     Optional - Path to a template for SNS SMS messages
     """
@@ -44,32 +44,32 @@ class SnsTopicChannel:
     """
     ARN of the SNS topic.
     """
-    role_arn: Optional[str] = None
+    role_arn: str | None = None
     """
     Optional - Use IAM role to publish messages using another IAM role
     """
-    ignore_errors: Optional[bool] = None
+    ignore_errors: bool | None = None
     """
     Prevents exception if true when an exception occurs.
     """
-    template: Optional[Template] = None
+    template: Template | None = None
     """
-    Allows to set specific templates for email and sms 
+    Allows to set specific templates for email and sms
     """
 
 
 @dataclass
 class Prometheus:
-    enabled: Optional[bool] = None
+    enabled: bool | None = None
 
 
 @dataclass
 class ClusterMetrics:
-    prometheus: Optional[Prometheus] = None
-    aws_emf: Optional[AwsEmf] = None
+    prometheus: Prometheus | None = None
+    aws_emf: AwsEmf | None = None
 
 
-Regexes = List[str]
+Regexes = list[str]
 
 
 class BackupStyle(Enum):
@@ -83,11 +83,11 @@ class AssumeRole:
     """
     Optional - IAM Role ARN to assume
     """
-    RoleSessionName: Optional[str] = "kafka-overwatch@aws"
+    RoleSessionName: str | None = "kafka-overwatch@aws"
     """
     Optional - Name of the session to use
     """
-    ExternalId: Optional[str] = None
+    ExternalId: str | None = None
     """
     Optional - External ID to use when assuming a role
     """
@@ -99,11 +99,11 @@ class IamOverride:
     Optional - IAM profile/settings override to use. Defaults to SDK settings.
     """
 
-    ProfileName: Optional[str] = None
+    ProfileName: str | None = None
     """
     Optional - Use IAM profile to publish messages using another IAM profile
     """
-    AssumeRole: Optional[AssumeRole] = None
+    AssumeRole: AssumeRole | None = None
 
 
 ClusterScanIntervalInSeconds = int
@@ -120,15 +120,15 @@ class Global:
 
 @dataclass
 class AwsEmfModel:
-    log_group_name: Optional[str] = "kafka/cluster/overwatch/metrics"
+    log_group_name: str | None = "kafka/cluster/overwatch/metrics"
     """
     override log group name to publish metrics to. Importance: High
     """
-    service_name: Optional[str] = None
+    service_name: str | None = None
     """
     override value for EMF Service name. Importance: Low
     """
-    watcher_config: Optional[AwsEmf] = None
+    watcher_config: AwsEmf | None = None
 
 
 @dataclass
@@ -137,20 +137,20 @@ class NotificationChannels:
     Channels to send notifications to when reports have been generated.
     """
 
-    sns: Optional[Dict[str, SnsTopicChannel]] = None
+    sns: dict[str, SnsTopicChannel] | None = None
 
 
 @dataclass
 class S3Output:
-    BucketName: Optional[str] = None
+    BucketName: str | None = None
     """
     Name of the S3 bucket
     """
-    PrefixKey: Optional[str] = ""
+    PrefixKey: str | None = ""
     """
     Path in the bucket.
     """
-    IamOverride: Optional[IamOverride] = None
+    IamOverride: IamOverride | None = None
 
 
 @dataclass
@@ -159,16 +159,16 @@ class ReportingConfig:
     Configure reporting output. Applies to all clusters.
     """
 
-    evaluation_period_in_seconds: Optional[int] = 60
+    evaluation_period_in_seconds: int | None = 60
     """
     Time to wait before generating reports
     """
-    S3: Optional[S3Output] = None
-    local: Optional[str] = "/tmp/kafka-overwatch-reports/"
+    S3: S3Output | None = None
+    local: str | None = "/tmp/kafka-overwatch-reports/"
     """
     Local directory to store the reports to.
     """
-    kafka: Optional[Dict[str, Any]] = None
+    kafka: dict[str, Any] | None = None
     """
     Configuration to persist reports into Kafka. Not yet implemented.
     """
@@ -180,16 +180,16 @@ class ClusterConfigAuth:
     Allows to set override configuration for secret values interpolation
     """
 
-    iam_override: Optional[IamOverride] = None
+    iam_override: IamOverride | None = None
 
 
 @dataclass
 class ClusterConfig:
-    kafka: Dict[str, Any]
+    kafka: dict[str, Any]
     """
     Configuration as documented in https://github.com/confluentinc/librdkafka/blob/master/CONFIGURATION.md
     """
-    cluster_config_auth: Optional[ClusterConfigAuth] = None
+    cluster_config_auth: ClusterConfigAuth | None = None
     """
     Allows to set override configuration for secret values interpolation
     """
@@ -197,11 +197,11 @@ class ClusterConfig:
 
 @dataclass
 class GatewayConfiguration:
-    gateway_config: Optional[Dict[str, Any]] = None
-    reporting_config: Optional[ReportingConfig] = None
-    topic_include_regexes: Optional[Regexes] = None
-    topic_exclude_regexes: Optional[Regexes] = None
-    metrics: Optional[ClusterMetrics] = None
+    gateway_config: dict[str, Any] | None = None
+    reporting_config: ReportingConfig | None = None
+    topic_include_regexes: Regexes | None = None
+    topic_exclude_regexes: Regexes | None = None
+    metrics: ClusterMetrics | None = None
     """
     Configure metrics export for the cluster
     """
@@ -209,15 +209,15 @@ class GatewayConfiguration:
 
 @dataclass
 class ClusterTopicBackupConfig:
-    enabled: Optional[bool] = False
+    enabled: bool | None = False
     """
     Enable/disable backup of the topics configuration
     """
-    S3: Optional[S3Output] = None
+    S3: S3Output | None = None
     """
     Enables exports to be sent to S3.
     """
-    BackupStyles: Optional[List[BackupStyle]] = field(
+    BackupStyles: list[BackupStyle] | None = field(
         default_factory=lambda: [BackupStyle.kafka_topics_sh]
     )
     """
@@ -229,18 +229,18 @@ class ClusterTopicBackupConfig:
 class ClusterConfiguration:
     cluster_config: ClusterConfig
     reporting_config: ReportingConfig
-    cluster_scan_interval_in_seconds: Optional[ClusterScanIntervalInSeconds] = 60
+    cluster_scan_interval_in_seconds: ClusterScanIntervalInSeconds | None = 60
     """
     Overrides the global setting
     """
-    topics_backup_config: Optional[ClusterTopicBackupConfig] = None
-    awareness_topic: Optional[str] = "_overwatchAwareness"
+    topics_backup_config: ClusterTopicBackupConfig | None = None
+    awareness_topic: str | None = "_overwatchAwareness"
     """
     Name of a topic that the Overwatch will subscribe to. This allows multiple instances of the overwatch to be aware and disable features that shouldn't be distributed
     """
-    topic_include_regexes: Optional[Regexes] = None
-    topic_exclude_regexes: Optional[Regexes] = None
-    metrics: Optional[ClusterMetrics] = None
+    topic_include_regexes: Regexes | None = None
+    topic_exclude_regexes: Regexes | None = None
+    metrics: ClusterMetrics | None = None
     """
     Configure metrics export for the cluster
     """
@@ -252,18 +252,18 @@ class KafkaOverwatchInputConfiguration:
     Specification for Kafka topics/partitions hunter service
     """
 
-    global_: Optional[Global] = None
+    global_: Global | None = None
     """
     Global settings. Apply to all clusters
     """
-    clusters: Optional[Dict[str, ClusterConfiguration]] = None
+    clusters: dict[str, ClusterConfiguration] | None = None
     """
     Kafka clusters to monitor and report on the partitions usage
     """
-    gateways: Optional[Dict[str, GatewayConfiguration]] = None
+    gateways: dict[str, GatewayConfiguration] | None = None
     """
     Gateways to monitor and import the vClusters from the partitions usage
     """
-    prometheus: Optional[Any] = None
-    notification_channels: Optional[NotificationChannels] = None
-    aws_emf: Optional[AwsEmfModel] = None
+    prometheus: Any | None = None
+    notification_channels: NotificationChannels | None = None
+    aws_emf: AwsEmfModel | None = None

@@ -37,9 +37,7 @@ class S3Handler:
         if not self._config.IamOverride:
             return self._session
         else:
-            return get_session_from_iam_override(
-                self._config.IamOverride
-            )
+            return get_session_from_iam_override(self._config.IamOverride)
 
     @property
     def client(self):

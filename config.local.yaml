@@ -4,8 +4,9 @@
 clusters:
   test-simple: # defaults filters out internal topics
     cluster_config:
-      bootstrap.servers: broker:29092
-      client.id: kafka-overwatch.test-simple
+      kafka:
+        bootstrap.servers: broker:29092
+        client.id: kafka-overwatch.test-simple
     topic_exclude_regexes:
       - ^_(.*)$
     x-test: whatever
@@ -18,8 +19,9 @@ clusters:
 
   test-exclude: # testing to exclude topics
     cluster_config:
-      bootstrap.servers: broker:29092
-      client.id: kafka-overwatch.test-exclude
+      kafka:
+        bootstrap.servers: broker:29092
+        client.id: kafka-overwatch.test-exclude
     topic_exclude_regexes:
       - ^test(.*)$
     reporting_config:
@@ -29,8 +31,9 @@ clusters:
 
   test-include: # show me only include topics, using default exclude rules
     cluster_config:
-      bootstrap.servers: broker:29092
-      client.id: kafka-overwatch.test-include
+      kafka:
+        bootstrap.servers: broker:29092
+        client.id: kafka-overwatch.test-include
     topic_include_regexes:
       - '^_(.*)$'
       - '^test(.*)'

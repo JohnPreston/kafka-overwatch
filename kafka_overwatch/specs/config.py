@@ -83,7 +83,7 @@ class AssumeRole:
     """
     Optional - IAM Role ARN to assume
     """
-    RoleSessionName: str | None = "kafka-overwatch@s3"
+    RoleSessionName: str | None = "kafka-overwatch@aws"
     """
     Optional - Name of the session to use
     """
@@ -175,6 +175,27 @@ class ReportingConfig:
 
 
 @dataclass
+class ClusterConfigAuth:
+    """
+    Allows to set override configuration for secret values interpolation
+    """
+
+    iam_override: IamOverride | None = None
+
+
+@dataclass
+class ClusterConfig:
+    kafka: dict[str, Any]
+    """
+    Configuration as documented in https://github.com/confluentinc/librdkafka/blob/master/CONFIGURATION.md
+    """
+    cluster_config_auth: ClusterConfigAuth | None = None
+    """
+    Allows to set override configuration for secret values interpolation
+    """
+
+
+@dataclass
 class GatewayConfiguration:
     gateway_config: dict[str, Any] | None = None
     reporting_config: ReportingConfig | None = None
@@ -206,10 +227,7 @@ class ClusterTopicBackupConfig:
 
 @dataclass
 class ClusterConfiguration:
-    cluster_config: dict[str, Any]
-    """
-    Configuration as documented in https://github.com/confluentinc/librdkafka/blob/master/CONFIGURATION.md
-    """
+    cluster_config: ClusterConfig
     reporting_config: ReportingConfig
     cluster_scan_interval_in_seconds: ClusterScanIntervalInSeconds | None = 60
     """

@@ -23,6 +23,7 @@ from datetime import timedelta as td
 from prometheus_client import Gauge, Summary
 from retry import retry
 
+from kafka_overwatch.aws_helpers.kafka_client_secrets import eval_kafka_client_config
 from kafka_overwatch.aws_helpers.s3 import S3Handler
 from kafka_overwatch.config.logging import KAFKA_LOG
 from kafka_overwatch.kafka_resources import get_admin_client, get_consumer_client
@@ -112,8 +113,9 @@ class KafkaCluster:
 
     @retry(tries=5)
     def set_cluster_connections(self) -> None:
-        self.admin_client: AdminClient = get_admin_client(self.config.cluster_config)
-        self.consumer_client: Consumer = get_consumer_client(self.config.cluster_config)
+        client_config = eval_kafka_client_config(self)
+        self.admin_client: AdminClient = get_admin_client(client_config)
+        self.consumer_client: Consumer = get_consumer_client(client_config)
 
     @property
     def config(self) -> ClusterConfiguration:

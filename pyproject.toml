@@ -49,6 +49,7 @@ pre-commit = "^3.6"
 datamodel-code-generator = "^0.25.1"
 pytest = "^7.4"
 testcontainers = "^3.7.1"
+tbump = "^6.11.0"
 
 [tool.poetry.scripts]
 kafka-overwatch = "kafka_overwatch.cli:main"

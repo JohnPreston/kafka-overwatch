@@ -97,7 +97,7 @@ tag_template = "v{new_version}"
 src = "pyproject.toml"
 
 [[tool.tbump.file]]
-src = "ecs_composex/__init__.py"
+src = "kafka_overwatch/__init__.py"
 
 [[tool.tbump.before_commit]]
 name = "Files format"

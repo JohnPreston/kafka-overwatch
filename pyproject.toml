@@ -29,16 +29,18 @@ exclude = ["*.pyc", "*~", "*pycache*"]
 [tool.poetry.dependencies]
 python = "^3.10"
 confluent-kafka = "^2.3.0"
-compose-x-common = "^1.4.3"
-boto3 = ">=1.34,<2.0"
+compose-x-common = "^1.4.4"
+boto3 = ">=1.26,<2.0"
 dacite = "^1.8.1"
 pyyaml = "^6.0.1"
-aws-cfn-custom-resource-resolve-parser = "^0.3.1"
+aws-cfn-custom-resource-resolve-parser = "^0.3"
 retry2 = "^0.9.5"
 jsonschema = "^4.20.0"
 aws-embedded-metrics = "^3.2.0"
 importlib-resources = "^6.1.1"
 prometheus-client = "^0.19.0"
+jinja2 = "^3.1.2"
+aws-msk-iam-sasl-signer-python = "^1.0.0"
 
 
 [tool.poetry.group.dev.dependencies]

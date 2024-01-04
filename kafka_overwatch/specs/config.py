@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 
 @dataclass
@@ -94,19 +94,62 @@ class AssumeRole:
 
 
 @dataclass
-class IamOverride:
+class IamOverride1:
     """
     Optional - IAM profile/settings override to use. Defaults to SDK settings.
     """
 
-    ProfileName: str | None = None
+    ProfileName: str
     """
     Optional - Use IAM profile to publish messages using another IAM profile
     """
     AssumeRole: AssumeRole | None = None
 
 
+@dataclass
+class IamOverride2:
+    """
+    Optional - IAM profile/settings override to use. Defaults to SDK settings.
+    """
+
+    AssumeRole: AssumeRole
+    ProfileName: str | None = None
+    """
+    Optional - Use IAM profile to publish messages using another IAM profile
+    """
+
+
+IamOverride = Union[IamOverride1, IamOverride2]
+
+
 ClusterScanIntervalInSeconds = int
+
+
+@dataclass
+class MskProvider:
+    iam_override: IamOverride | None = None
+    """
+    Override default session to perform the clusters discovery
+    """
+    exclude_regions: list[str] | None = None
+    """
+    List of regions not to look for MSK clusters
+    """
+
+
+@dataclass
+class ConfluentCloudAuth:
+    api_key: str | None = None
+    """
+    The API key to use to perform API calls to Confluent Cloud
+    """
+    api_secret: str | None = None
+    """
+    The API Secret to perform API calls to Confluent Cloud
+    """
+
+
+ProfileName = str
 
 
 @dataclass
@@ -115,7 +158,7 @@ class Global:
     Global settings. Apply to all clusters
     """
 
-    ClusterScanIntervalInSeconds: ClusterScanIntervalInSeconds
+    cluster_scan_interval_in_seconds: ClusterScanIntervalInSeconds
 
 
 @dataclass
@@ -132,6 +175,15 @@ class AwsEmfModel:
 
 
 @dataclass
+class SaaSProviderAwsSecretsManager:
+    secret_id: str | None = None
+    """
+    Name or ARN of secret to use to store the key. If ARN is detected, existing secret content will be updated. If name is provided but not found, creates new secret.
+    """
+    iam_override: IamOverride | None = None
+
+
+@dataclass
 class NotificationChannels:
     """
     Channels to send notifications to when reports have been generated.
@@ -142,15 +194,15 @@ class NotificationChannels:
 
 @dataclass
 class S3Output:
-    BucketName: str | None = None
+    bucket_name: str | None = None
     """
     Name of the S3 bucket
     """
-    PrefixKey: str | None = ""
+    prefix_key: str | None = ""
     """
     Path in the bucket.
     """
-    IamOverride: IamOverride | None = None
+    iam_override: IamOverride | None = None
 
 
 @dataclass
@@ -185,7 +237,7 @@ class ClusterConfigAuth:
 
 @dataclass
 class ClusterConfig:
-    kafka: dict[str, Any]
+    kafka: dict[str, Any] | None = None
     """
     Configuration as documented in https://github.com/confluentinc/librdkafka/blob/master/CONFIGURATION.md
     """
@@ -193,6 +245,21 @@ class ClusterConfig:
     """
     Allows to set override configuration for secret values interpolation
     """
+
+
+@dataclass
+class Iam:
+    ProfileName: ProfileName | None = None
+    AssumeRole: AssumeRole | None = None
+
+
+@dataclass
+class MskClusterConfig:
+    cluster_arn: str | None = None
+    """
+    The ARN of the MSK Cluster. This will be used to get the cluster details, including bootstrap details.
+    """
+    iam: Iam | None = None
 
 
 @dataclass
@@ -226,18 +293,68 @@ class ClusterTopicBackupConfig:
 
 
 @dataclass
+class SaveCredentials:
+    """
+    Optional - If set, will save the generated credentials for the cluster
+    """
+
+    aws_secrets_manager: SaaSProviderAwsSecretsManager | None = None
+
+
+@dataclass
+class KafkaServiceAccount:
+    name: str | None = "kafka-overwatch"
+    """
+    Name of the Confluent service account to create
+    """
+    description: str | None = "kafka-overwatch"
+    """
+    Service account description
+    """
+    allow_create: bool | None = True
+    """
+    If the service account with the ServiceAccountName is not found, creates one. If false and cannot find service account, provider will be failed.
+    """
+    save_credentials: SaveCredentials | None = None
+    """
+    Optional - If set, will save the generated credentials for the cluster
+    """
+
+
+@dataclass
+class ConfluentProvider:
+    """
+    Confluent Cloud settings to use to perform the discovery
+    """
+
+    confluent_cloud_auth: ConfluentCloudAuth | None = None
+    kafka_service_account: KafkaServiceAccount | None = None
+
+
+@dataclass
+class Providers:
+    """
+    Allows to define a Kafka SaaS provider and perform discovery of existing clusters to scan
+    """
+
+    aiven: Any | None = None
+    aws_msk: MskProvider | None = None
+    confluent_cloud: ConfluentProvider | None = None
+    conduktor_gateway: dict[str, GatewayConfiguration] | None = None
+    """
+    Gateways to monitor and import the vClusters from the partitions usage
+    """
+
+
+@dataclass
 class ClusterConfiguration:
-    cluster_config: ClusterConfig
+    cluster_config: ClusterConfig | MskClusterConfig
     reporting_config: ReportingConfig
     cluster_scan_interval_in_seconds: ClusterScanIntervalInSeconds | None = 60
     """
     Overrides the global setting
     """
     topics_backup_config: ClusterTopicBackupConfig | None = None
-    awareness_topic: str | None = "_overwatchAwareness"
-    """
-    Name of a topic that the Overwatch will subscribe to. This allows multiple instances of the overwatch to be aware and disable features that shouldn't be distributed
-    """
     topic_include_regexes: Regexes | None = None
     topic_exclude_regexes: Regexes | None = None
     metrics: ClusterMetrics | None = None
@@ -260,9 +377,9 @@ class KafkaOverwatchInputConfiguration:
     """
     Kafka clusters to monitor and report on the partitions usage
     """
-    gateways: dict[str, GatewayConfiguration] | None = None
+    providers: Providers | None = None
     """
-    Gateways to monitor and import the vClusters from the partitions usage
+    Allows to define a Kafka SaaS provider and perform discovery of existing clusters to scan
     """
     prometheus: Any | None = None
     notification_channels: NotificationChannels | None = None

@@ -15,10 +15,10 @@
       "additionalProperties": false,
       "description": "Global settings. Apply to all clusters",
       "required": [
-        "ClusterScanIntervalInSeconds"
+        "cluster_scan_interval_in_seconds"
       ],
       "properties": {
-        "ClusterScanIntervalInSeconds": {
+        "cluster_scan_interval_in_seconds": {
           "$ref": "#/definitions/ClusterScanIntervalInSeconds",
           "default": 60
         }
@@ -35,14 +35,32 @@
         }
       }
     },
-    "gateways": {
+    "providers": {
       "type": "object",
-      "description": "Gateways to monitor and import the vClusters from the partitions usage",
       "additionalProperties": false,
-      "uniqueItems": true,
       "patternProperties": {
-        "^[a-zA-Z\\d\\-_]+$": {
-          "$ref": "#/definitions/gatewayConfiguration"
+        "x-": {}
+      },
+      "description": "Allows to define a Kafka SaaS provider and perform discovery of existing clusters to scan",
+      "properties": {
+        "aiven": {
+        },
+        "aws_msk": {
+          "$ref": "#/definitions/MskProvider"
+        },
+        "confluent_cloud": {
+          "$ref": "#/definitions/ConfluentProvider"
+        },
+        "conduktor_gateway": {
+          "type": "object",
+          "description": "Gateways to monitor and import the vClusters from the partitions usage",
+          "additionalProperties": false,
+          "uniqueItems": true,
+          "patternProperties": {
+            "^[a-zA-Z\\d\\-_]+$": {
+              "$ref": "#/definitions/gatewayConfiguration"
+            }
+          }
         }
       }
     },
@@ -69,6 +87,18 @@
     }
   },
   "definitions": {
+    "SaaSProviderAwsSecretsManager": {
+      "type": "object",
+      "properties": {
+        "secret_id": {
+          "type": "string",
+          "description": "Name or ARN of secret to use to store the key. If ARN is detected, existing secret content will be updated. If name is provided but not found, creates new secret."
+        },
+        "iam_override": {
+          "$ref": "#/definitions/IamOverride"
+        }
+      }
+    },
     "aws_emf": {
       "type": "object",
       "required": [
@@ -173,16 +203,16 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "BucketName": {
+        "bucket_name": {
           "type": "string",
           "description": "Name of the S3 bucket"
         },
-        "PrefixKey": {
+        "prefix_key": {
           "type": "string",
           "default": "",
           "description": "Path in the bucket."
         },
-        "IamOverride": {
+        "iam_override": {
           "$ref": "#/definitions/IamOverride"
         }
       }
@@ -232,37 +262,44 @@
           "default": 60
         },
         "cluster_config": {
-          "type": "object",
-          "required": [
-            "kafka"
-          ],
-          "properties": {
-            "kafka": {
+          "oneOf": [
+            {
               "type": "object",
-              "description": "Configuration as documented in https://github.com/confluentinc/librdkafka/blob/master/CONFIGURATION.md"
-            },
-            "cluster_config_auth": {
-              "type": "object",
-              "description": "Allows to set override configuration for secret values interpolation",
+              "title": "KafkaClusterConfig",
               "additionalProperties": false,
+              "patternProperties": {
+                "x-": {
+                }
+              },
               "properties": {
-                "iam_override": {
-                  "$ref": "#/definitions/IamOverride"
+                "kafka": {
+                  "type": "object",
+                  "description": "Configuration as documented in https://github.com/confluentinc/librdkafka/blob/master/CONFIGURATION.md"
+                },
+                "cluster_config_auth": {
+                  "type": "object",
+                  "description": "Allows to set override configuration for secret values interpolation",
+                  "additionalProperties": false,
+                  "properties": {
+                    "iam_override": {
+                      "$ref": "#/definitions/IamOverride"
+                    }
+                  }
                 }
               }
+            },
+            {
+              "$ref": "#/definitions/MskClusterConfig",
+              "description": "Offloads the MSK settings discovery and uses AWS IAM Authentication.",
+              "title": "MSKClusterConfig"
             }
-          }
+          ]
         },
         "reporting_config": {
           "$ref": "#/definitions/ReportingConfig"
         },
         "topics_backup_config": {
           "$ref": "#/definitions/ClusterTopicBackupConfig"
-        },
-        "awareness_topic": {
-          "type": "string",
-          "description": "Name of a topic that the Overwatch will subscribe to. This allows multiple instances of the overwatch to be aware and disable features that shouldn't be distributed",
-          "default": "_overwatchAwareness"
         },
         "topic_include_regexes": {
           "$ref": "#/definitions/regexes"
@@ -277,9 +314,36 @@
       },
       "additionalItems": false,
       "patternProperties": {
-        "x-": {}
+        "x-": {
+        }
       },
       "uniqueItems": true
+    },
+    "MskClusterConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "x-": {
+        }
+      },
+      "properties": {
+        "cluster_arn": {
+          "type": "string",
+          "description": "The ARN of the MSK Cluster. This will be used to get the cluster details, including bootstrap details."
+        },
+        "iam": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "ProfileName": {
+              "$ref": "#/definitions/IamOverride/properties/ProfileName"
+            },
+            "AssumeRole": {
+              "$ref": "#/definitions/IamOverride/properties/AssumeRole"
+            }
+          }
+        }
+      }
     },
     "gatewayConfiguration": {
       "type": "object",
@@ -303,7 +367,8 @@
       },
       "additionalItems": false,
       "patternProperties": {
-        "x-": {}
+        "x-": {
+        }
       },
       "uniqueItems": true
     },
@@ -339,6 +404,18 @@
     "IamOverride": {
       "type": "object",
       "description": "Optional - IAM profile/settings override to use. Defaults to SDK settings.",
+      "oneOf": [
+        {
+          "required": [
+            "ProfileName"
+          ]
+        },
+        {
+          "required": [
+            "AssumeRole"
+          ]
+        }
+      ],
       "properties": {
         "ProfileName": {
           "type": "string",
@@ -372,6 +449,76 @@
       "minimum": 10,
       "maximum": 3600,
       "description": "Interval, in seconds, to wait between clusters scan."
+    },
+    "MskProvider": {
+      "type": "object",
+      "properties": {
+        "iam_override": {
+          "$ref": "#/definitions/IamOverride",
+          "description": "Override default session to perform the clusters discovery"
+        },
+        "exclude_regions": {
+          "type": "array",
+          "description": "List of regions not to look for MSK clusters",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$"
+          }
+        }
+      }
+    },
+    "ConfluentProvider": {
+      "type": "object",
+      "description": "Confluent Cloud settings to use to perform the discovery",
+      "additionalProperties": false,
+      "patternProperties": {
+        "x-": {}
+      },
+      "properties": {
+        "confluent_cloud_auth": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "api_key": {
+              "type": "string",
+              "description": "The API key to use to perform API calls to Confluent Cloud"
+            },
+            "api_secret": {
+              "type": "string",
+              "description": "The API Secret to perform API calls to Confluent Cloud"
+            }
+          }
+        },
+        "kafka_service_account": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "default": "kafka-overwatch",
+              "description": "Name of the Confluent service account to create"
+            },
+            "description": {
+              "type": "string",
+              "description": "Service account description",
+              "default": "kafka-overwatch"
+            },
+            "allow_create": {
+              "type": "boolean",
+              "default": true,
+              "description": "If the service account with the ServiceAccountName is not found, creates one. If false and cannot find service account, provider will be failed."
+            },
+            "save_credentials": {
+              "type": "object",
+              "description": "Optional - If set, will save the generated credentials for the cluster",
+              "properties": {
+                "aws_secrets_manager": {
+                  "$ref": "#/definitions/SaaSProviderAwsSecretsManager"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

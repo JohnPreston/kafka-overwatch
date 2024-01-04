@@ -22,15 +22,10 @@ from boto3.session import Session
 
 from kafka_overwatch.aws_helpers import get_session_from_iam_override
 from kafka_overwatch.config.logging import KAFKA_LOG
+from kafka_overwatch.specs.config import ClusterConfig, MskClusterConfig
 
 
-def eval_kafka_client_config(kafka_cluster: KafkaCluster) -> dict:
-    """
-    If a configuration value is a string starting with {{resolve:}} the value is interpolated
-    using AWS SecretsManager or AWS SSM.
-    We create a new dict in order to preserve the original
-    """
-
+def handle_librdkafka_config(kafka_cluster: KafkaCluster) -> dict:
     if (
         kafka_cluster.config.cluster_config.cluster_config_auth
         and kafka_cluster.config.cluster_config.cluster_config_auth.iam_override
@@ -54,4 +49,17 @@ def eval_kafka_client_config(kafka_cluster: KafkaCluster) -> dict:
                 KAFKA_LOG.error(
                     f"Error while resolving {config_value}: {error}. Using value as-is."
                 )
+    return client_config
+
+
+def eval_kafka_client_config(kafka_cluster: KafkaCluster) -> dict:
+    """
+    If a configuration value is a string starting with {{resolve:}} the value is interpolated
+    using AWS SecretsManager or AWS SSM.
+    We create a new dict in order to preserve the original
+    """
+    if isinstance(kafka_cluster.config.cluster_config, MskClusterConfig):
+        raise NotImplementedError("MskClusterConfig is not yet implemented.")
+
+    client_config = handle_librdkafka_config(kafka_cluster)
     return client_config

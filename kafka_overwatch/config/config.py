@@ -31,7 +31,7 @@ class OverwatchConfig:
         prometheus_dir: TemporaryDirectory,
     ):
         if not config.global_:
-            config.global_ = from_dict(Global, {"ClusterScanIntervalInSeconds": 30})
+            config.global_ = from_dict(Global, {"cluster_scan_interval_in_seconds": 30})
         self._config = config
         self._prometheus_registry_dir = prometheus_dir
 

@@ -18,7 +18,7 @@ class S3Handler:
     def __init__(self, s3_output_config: S3Output):
         self._config = s3_output_config
 
-        if not self._config.IamOverride:
+        if not self._config.iam_override:
             self._session: Session = Session()
         else:
             self._session = None
@@ -34,10 +34,10 @@ class S3Handler:
 
     @property
     def session(self) -> Session:
-        if not self._config.IamOverride:
+        if not self._config.iam_override:
             return self._session
         else:
-            return get_session_from_iam_override(self._config.IamOverride)
+            return get_session_from_iam_override(self._config.iam_override)
 
     @property
     def client(self):
@@ -51,27 +51,32 @@ class S3Handler:
 
     @retry((S3UploadFailedError,), tries=3, delay=1, logger=KAFKA_LOG)
     def upload(self, report: str, report_name: str, mime_type: str = None):
+        prefix_key: str = (
+            f"{self._config.prefix_key}/{report_name}"
+            if self._config.prefix_key != ""
+            else report_name
+        )
         try:
             self.client.put_object(
-                Bucket=self._config.BucketName,
-                Key=f"{self._config.PrefixKey}/{report_name}",
+                Bucket=self._config.bucket_name,
+                Key=prefix_key,
                 Body=report.encode("utf-8"),
                 ContentType="application/json" if not mime_type else mime_type,
             )
             KAFKA_LOG.info(
                 "File uploaded to "
-                f"{self.config.BucketName}/{self.config.PrefixKey}/{report_name}"
+                f"{self.config.bucket_name}/{self.config.prefix_key}/{report_name}"
             )
             return
         except ClientError as error:
             KAFKA_LOG.exception(error)
             KAFKA_LOG.error(
                 "Failed to upload report to "
-                f"{self.config.BucketName}/{self.config.PrefixKey}/{report_name}"
+                f"{self.config.bucket_name}/{self.config.prefix_key}/{report_name}"
             )
         except Exception as error:
             KAFKA_LOG.exception(error)
             KAFKA_LOG.error(
                 "Failed to upload report to "
-                f"{self.config.BucketName}/{self.config.PrefixKey}/{report_name}"
+                f"{self.config.bucket_name}/{self.config.prefix_key}/{report_name}"
             )

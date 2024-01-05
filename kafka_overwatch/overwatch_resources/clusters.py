@@ -21,6 +21,7 @@ from datetime import datetime as dt
 from datetime import timedelta as td
 
 from confluent_kafka.admin import KafkaError
+from pandas import DataFrame
 from prometheus_client import Gauge, Summary
 from retry import retry
 
@@ -236,6 +237,13 @@ fi
         return report
 
 
+def generate_cluster_topics_pd_dataframe(topics: dict[str, Topic]) -> DataFrame:
+    topics_data: list[dict] = []
+    for topic in topics.values():
+        topics_data.append(topic.pd_frame_data)
+    return DataFrame(topics_data)
+
+
 def get_cluster_usage(cluster_name: str, kafka_cluster: KafkaCluster) -> ClusterReport:
     """
     Based on the topics to monitor, as per the configuration, evaluates the usage of the topics identified.
@@ -243,6 +251,7 @@ def get_cluster_usage(cluster_name: str, kafka_cluster: KafkaCluster) -> Cluster
     """
     cluster_topics: dict[str, ReportingTopic] = {}
     total_topics_partitions: int = 0
+    topics_data_frame = generate_cluster_topics_pd_dataframe(kafka_cluster.topics)
     topics_without_new_messages: list = []
     for topic in kafka_cluster.monitored_topics.values():
         total_topics_partitions += len(topic.partitions)
@@ -282,6 +291,7 @@ def get_cluster_usage(cluster_name: str, kafka_cluster: KafkaCluster) -> Cluster
         metadata=Metadata(timestamp=dt.utcnow().isoformat()),
         cluster_name=cluster_name,
         topics=cluster_topics,
+        topics_pd_df=topics_data_frame.to_dict(),
         statistics=cluster_stats,
     )
     return cluster

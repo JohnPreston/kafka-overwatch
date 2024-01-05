@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 
 @dataclass
@@ -105,6 +105,7 @@ class ClusterReport:
     cluster_name: str
     metadata: Metadata
     topics: dict[str, Topic]
+    topics_pd_df: Any | None = None
     statistics: Statistics | None = None
     estimated_waste: EstimatedWaste | None = None
 

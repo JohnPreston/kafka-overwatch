@@ -6,13 +6,17 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from pandas import DataFrame
     from prometheus_client import Gauge
     from kafka_overwatch.config.config import OverwatchConfig
+    from kafka_overwatch.overwatch_resources.topics import Topic
 
 import os
 import time
 from datetime import datetime as dt
 from datetime import timedelta as td
+
+import pandas
 
 from kafka_overwatch.kafka_resources.groups import set_update_cluster_consumer_groups
 from kafka_overwatch.kafka_resources.topics import describe_update_all_topics
@@ -88,8 +92,8 @@ def process_cluster(
             set_update_cluster_consumer_groups(kafka_cluster)
         kafka_cluster.cluster_consumer_groups_count.set(len(kafka_cluster.groups))
         kafka_cluster.render_restore_files()
-        generate_cluster_report(kafka_cluster)
         measure_consumer_group_lags(kafka_cluster, consumer_group_lag_gauge)
+        generate_cluster_report(kafka_cluster)
 
         for _ in range(1, kafka_cluster.config.cluster_scan_interval_in_seconds):
             if not kafka_cluster.keep_running:

@@ -43,6 +43,7 @@
             }
           }
         },
+        "topics_pd_df": {},
         "statistics": {
           "type": "object",
           "additionalProperties": false,

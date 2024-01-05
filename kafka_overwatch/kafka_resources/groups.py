@@ -139,12 +139,16 @@ def describe_update_consumer_groups(queue: Queue) -> None:
             KAFKA_LOG.debug(f"Describing consumer group {group} - {kafka_cluster.name}")
             try:
                 if group not in kafka_cluster.groups:
-                    kafka_cluster.groups[group] = ConsumerGroup(
+                    consumer_group = ConsumerGroup(
                         group_description.group_id,
                         group_description.members,
                         group_description.state,
                     )
-                consumer_group = kafka_cluster.groups[group]
+                    kafka_cluster.groups[group] = consumer_group
+                else:
+                    consumer_group: ConsumerGroup = kafka_cluster.groups[group]
+                    consumer_group.members = group_description.members
+                    consumer_group.state = group_description.state
                 group_offsets = wait_for_result(
                     kafka_cluster.admin_client.list_consumer_group_offsets(
                         [ConsumerGroupTopicPartitions(group_description.group_id)]

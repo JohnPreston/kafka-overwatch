@@ -64,7 +64,7 @@ class KafkaCluster:
 
         self._admin_client = None
         self._consumer_client = None
-        self.s3_report: S3Handler = None
+        self.s3_report: S3Handler | None = None
         self.local_reports_directory_path = None
         self.s3_backup = None
 
@@ -174,13 +174,13 @@ class KafkaCluster:
             f"Cluster {self.name} - Attempt to exit gracefully due to signal/interruption - {pid}"
         )
         self.keep_running = False
-        if not self.topics_watermarks_queue.qsize() == 0:
+        if self.topics_watermarks_queue.qsize() != 0:
             KAFKA_LOG.info(f"{self.name} - Clearing non-empty topic describe queue")
             with self.topics_watermarks_queue.mutex:
                 self.topics_watermarks_queue.queue.clear()
                 self.topics_watermarks_queue.all_tasks_done.notify_all()
                 self.topics_watermarks_queue.unfinished_tasks = 0
-        if not self.groups_describe_queue.qsize() == 0:
+        if self.groups_describe_queue.qsize() != 0:
             KAFKA_LOG.info(f"{self.name} - Clearing non-empty groups describe queue")
             with self.groups_describe_queue.mutex:
                 self.groups_describe_queue.queue.clear()

@@ -77,6 +77,10 @@ def process_cluster(
     kafka_cluster = KafkaCluster(
         cluster_name, cluster_config, overwatch_config=overwatch_config
     )
+    kafka_cluster.set_cluster_connections()
+    kafka_cluster.set_cluster_properties()
+    kafka_cluster.set_reporting_exporters()
+
     consumer_group_lag_gauge = overwatch_config.prometheus_collectors[
         "consumer_group_lag"
     ]
@@ -91,7 +95,11 @@ def process_cluster(
         with kafka_cluster.groups_describe_latency.time():
             set_update_cluster_consumer_groups(kafka_cluster)
         kafka_cluster.cluster_consumer_groups_count.set(len(kafka_cluster.groups))
-        kafka_cluster.render_restore_files()
+        if (
+            kafka_cluster.config.topics_backup_config
+            and kafka_cluster.config.topics_backup_config.enabled
+        ):
+            kafka_cluster.render_restore_files()
         measure_consumer_group_lags(kafka_cluster, consumer_group_lag_gauge)
         generate_cluster_report(kafka_cluster)
 

@@ -72,6 +72,15 @@ class ClusterMetrics:
 Regexes = list[str]
 
 
+@dataclass
+class OutputFormats:
+    """
+    The different types of outputs to produce.
+    """
+
+    pandas_dataframe: list[str] | None = None
+
+
 class BackupStyle(Enum):
     cfn_kafka_admin = "cfn-kafka-admin"
     kafka_topics_sh = "kafka-topics.sh"
@@ -206,15 +215,11 @@ class S3Output:
 
 
 @dataclass
-class ReportingConfig:
+class Exports:
     """
-    Configure reporting output. Applies to all clusters.
+    Reporting export locations
     """
 
-    evaluation_period_in_seconds: int | None = 60
-    """
-    Time to wait before generating reports
-    """
     S3: S3Output | None = None
     local: str | None = "/tmp/kafka-overwatch-reports/"
     """
@@ -223,6 +228,26 @@ class ReportingConfig:
     kafka: dict[str, Any] | None = None
     """
     Configuration to persist reports into Kafka. Not yet implemented.
+    """
+
+
+@dataclass
+class ReportingConfig:
+    """
+    Configure reporting output. Applies to all clusters.
+    """
+
+    evaluation_period_in_seconds: int | None = 60
+    """
+    Interval between reports.
+    """
+    output_formats: OutputFormats | None = None
+    """
+    The different types of outputs to produce.
+    """
+    exports: Exports | None = None
+    """
+    Reporting export locations
     """
 
 

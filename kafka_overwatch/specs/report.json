@@ -16,7 +16,6 @@
       "type": "object",
       "required": [
         "cluster_name",
-        "topics",
         "metadata"
       ],
       "properties": {
@@ -35,15 +34,6 @@
             }
           }
         },
-        "topics": {
-          "type": "object",
-          "patternProperties": {
-            "^[a-zA-Z0-9\\.\\_\\-]+": {
-              "$ref": "#/definitions/topic"
-            }
-          }
-        },
-        "topics_pd_df": {},
         "statistics": {
           "type": "object",
           "additionalProperties": false,
@@ -58,6 +48,13 @@
             "partitions": {
               "type": "integer",
               "description": "Sum of partitions for the topics"
+            },
+            "most_active_topics": {
+              "description": "Topics in the 0.75 percentile of number of messages and new_messages which active consumer groups",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             },
             "consumer_groups": {
               "type": "object",
@@ -91,67 +88,55 @@
             "partitions": {
               "type": "integer",
               "description": "Sum of partitions for the topics"
+            },
+            "topic_categories": {
+              "type": "object",
+              "patternProperties": {
+                "^[a-zA-Z0-9]+": {
+                  "$ref": "#/definitions/topic_waste_category"
+                }
+              }
             }
           }
         }
       }
     },
-    "topic": {
+    "topic_waste_category": {
       "type": "object",
       "required": [
-        "partitions_count",
-        "new_messages_observed"
+        "topics",
+        "topic_partitions_sum",
+        "description"
       ],
       "properties": {
-        "partitions_count": {
+        "topics": {
+          "type": "object",
+          "additionalProperties": false,
+          "patternProperties": {
+            "[a-zA-Z0-9_.\\-]{3,256}": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Topic Name: Partitions count"
+            }
+          }
+        },
+        "topics_count": {
           "type": "integer",
-          "description": "Number of partitions for the topic"
+          "minimum": 1
         },
-        "new_messages_observed": {
-          "type": "object",
-          "required": [
-            "count",
-            "elapsed_time"
-          ],
-          "properties": {
-            "count": {
-              "type": "integer",
-              "description": "Number of new messages observed, as per offset ends changed"
-            },
-            "elapsed_time": {
-              "type": "integer",
-              "description": "Amount of time in seconds passed for the evaluation"
-            }
-          }
+        "topic_partitions_sum": {
+          "type": "integer",
+          "minimum": 1
         },
-        "consumption": {
-          "type": "object",
-          "properties": {
-            "active_consumer_groups_count": {
-              "type": "integer",
-              "description": "Number of active consumer groups (lag = 0)"
-            },
-            "inactive_consumer_groups_count": {
-              "type": "integer",
-              "description": "Number of inactive consumer groups (lag > 0) or groups without members"
-            }
-          }
+        "cluster_percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "The percentage of topics fit into that category within the cluster"
         },
-        "recommendation": {
-          "type": "object",
-          "properties": {
-            "description": {
-              "type": "string",
-              "description": "Recommendation for the topic"
-            },
-            "suggested_actions": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "List of suggested actions"
-            }
-          }
+        "description": {
+          "type": "string",
+          "description": "The description of the category"
         }
       }
     }

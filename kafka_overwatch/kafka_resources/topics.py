@@ -174,7 +174,7 @@ def init_set_partitions(queue):
                         partition = topic_obj.partitions[_partition.id]
                         partition.end_offset = end_offset, now
                         if start_offset != partition.init_start_offset[0]:
-                            partition.first_offset = start_offset
+                            partition.first_offset = start_offset, now
                 except Exception as error:
                     KAFKA_LOG.exception(error)
                     KAFKA_LOG.error(

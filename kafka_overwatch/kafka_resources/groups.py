@@ -82,8 +82,15 @@ def set_update_cluster_consumer_groups(
             False,
         )
     if kafka_cluster.groups_describe_queue.qsize() == 0:
-        KAFKA_LOG.info(f"{kafka_cluster.name}: no consumer group to describe in queue.")
+        KAFKA_LOG.info(
+            f"{kafka_cluster.name} -  no consumer group to describe in queue."
+        )
         return
+    KAFKA_LOG.info(
+        f"{kafka_cluster.name} - {kafka_cluster.groups_describe_queue.qsize()}"
+        " CGs to retrieve metadata for."
+    )
+    KAFKA_LOG.debug(f"{kafka_cluster.name} - CG list len: {len(query_groups_list)}")
 
     for _ in range(1, kafka_cluster.cluster_brokers_count or NUM_THREADS):
         _thread = Thread(
@@ -134,6 +141,9 @@ def describe_update_consumer_groups(queue: Queue) -> None:
     while 42:
         if not queue.empty():
             desc_future, kafka_cluster = queue.get()
+            if not kafka_cluster.keep_running:
+                KAFKA_LOG.warning("Kafka cluster processing interruption requested.")
+                return
             group_description: ConsumerGroupDescription = desc_future.result()
             group = group_description.group_id
             KAFKA_LOG.debug(f"Describing consumer group {group} - {kafka_cluster.name}")

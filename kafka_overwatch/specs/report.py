@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 
 @dataclass
@@ -41,7 +41,26 @@ class Statistics:
     """
     Sum of partitions for the topics
     """
+    most_active_topics: list[str] | None = None
+    """
+    Topics in the 0.75 percentile of number of messages and new_messages which active consumer groups
+    """
     consumer_groups: ConsumerGroups | None = None
+
+
+@dataclass
+class TopicWasteCategory:
+    topics: dict[str, int]
+    topic_partitions_sum: int
+    description: str
+    """
+    The description of the category
+    """
+    topics_count: int | None = None
+    cluster_percentage: float | None = None
+    """
+    The percentage of topics fit into that category within the cluster
+    """
 
 
 @dataclass
@@ -51,61 +70,13 @@ class EstimatedWaste:
     """
     Sum of partitions for the topics
     """
-
-
-@dataclass
-class NewMessagesObserved:
-    count: int
-    """
-    Number of new messages observed, as per offset ends changed
-    """
-    elapsed_time: int
-    """
-    Amount of time in seconds passed for the evaluation
-    """
-
-
-@dataclass
-class Consumption:
-    active_consumer_groups_count: int | None = None
-    """
-    Number of active consumer groups (lag = 0)
-    """
-    inactive_consumer_groups_count: int | None = None
-    """
-    Number of inactive consumer groups (lag > 0) or groups without members
-    """
-
-
-@dataclass
-class Recommendation:
-    description: str | None = None
-    """
-    Recommendation for the topic
-    """
-    suggested_actions: list[str] | None = None
-    """
-    List of suggested actions
-    """
-
-
-@dataclass
-class Topic:
-    partitions_count: int
-    """
-    Number of partitions for the topic
-    """
-    new_messages_observed: NewMessagesObserved
-    consumption: Consumption | None = None
-    recommendation: Recommendation | None = None
+    topic_categories: dict[str, TopicWasteCategory] | None = None
 
 
 @dataclass
 class ClusterReport:
     cluster_name: str
     metadata: Metadata
-    topics: dict[str, Topic]
-    topics_pd_df: Any | None = None
     statistics: Statistics | None = None
     estimated_waste: EstimatedWaste | None = None
 

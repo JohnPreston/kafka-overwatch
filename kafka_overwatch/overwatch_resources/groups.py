@@ -67,7 +67,10 @@ class ConsumerGroup:
 
     @property
     def is_active(self) -> bool:
-        if self.state not in [ConsumerGroupState.DEAD, ConsumerGroupState.EMPTY]:
+        if (
+            self.state not in [ConsumerGroupState.DEAD, ConsumerGroupState.EMPTY]
+            and self.members
+        ):
             return True
         return False
 
@@ -82,7 +85,14 @@ class ConsumerGroup:
                     partition.partition
                 ]
                 if partition.offset < 0:
-                    KAFKA_LOG.debug(
+                    print("CG PARTITION", partition, partition)
+                    print(
+                        "TOPIC PARTITION",
+                        _overwatch_topic_partition.end_offset,
+                        _overwatch_topic_partition,
+                    )
+
+                    KAFKA_LOG.info(
                         "{} - {}: {}.{} reported offset is negative. Could indicate changes on the topic.".format(
                             overwatch_topic.cluster.name,
                             self.group_id,
@@ -90,6 +100,7 @@ class ConsumerGroup:
                             _overwatch_topic_partition.partition_id,
                         )
                     )
+                    continue
                 if _overwatch_topic_partition.total_messages_count == 0:
                     KAFKA_LOG.debug(
                         "{} - {}: {}.{} No messages on partition. Skipping for consumer lag.".format(

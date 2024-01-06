@@ -231,20 +231,38 @@
         "evaluation_period_in_seconds": {
           "type": "integer",
           "minimum": 60,
-          "description": "Time to wait before generating reports",
+          "description": "Interval between reports.",
           "default": 60
         },
-        "S3": {
-          "$ref": "#/definitions/S3Output"
-        },
-        "local": {
-          "type": "string",
-          "description": "Local directory to store the reports to.",
-          "default": "/tmp/kafka-overwatch-reports/"
-        },
-        "kafka": {
+        "output_formats": {
           "type": "object",
-          "description": "Configuration to persist reports into Kafka. Not yet implemented."
+          "description": "The different types of outputs to produce.",
+          "properties": {
+            "pandas_dataframe": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "exports": {
+          "type": "object",
+          "description": "Reporting export locations",
+          "properties": {
+            "S3": {
+              "$ref": "#/definitions/S3Output"
+            },
+            "local": {
+              "type": "string",
+              "description": "Local directory to store the reports to.",
+              "default": "/tmp/kafka-overwatch-reports/"
+            },
+            "kafka": {
+              "type": "object",
+              "description": "Configuration to persist reports into Kafka. Not yet implemented."
+            }
+          }
         }
       }
     },

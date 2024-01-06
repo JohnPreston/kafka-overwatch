@@ -157,24 +157,28 @@ def init_set_partitions(queue):
         if not queue.empty():
             topic_obj, consumer_client, topic, now = queue.get()
             partitions = topic.partitions
-            for partition in partitions:
+            for _partition in partitions:
                 try:
                     start_offset, end_offset = get_topic_partition_watermarks(
-                        consumer_client, topic.name, partition.id
+                        consumer_client, topic.name, _partition.id
                     )
                     if start_offset is None or end_offset is None:
                         KAFKA_LOG.debug("No start offset or end offset data retrieved")
                         continue
-                    if partition.id not in topic_obj.partitions:
-                        topic_obj.partitions[partition.id] = Partition(
-                            topic_obj, partition.id, start_offset, end_offset, now
+                    if _partition.id not in topic_obj.partitions:
+                        partition = Partition(
+                            topic_obj, _partition.id, start_offset, end_offset, now
                         )
+                        topic_obj.partitions[_partition.id] = partition
                     else:
-                        topic_obj.partitions[partition.id].end_offset = end_offset, now
+                        partition = topic_obj.partitions[_partition.id]
+                        partition.end_offset = end_offset, now
+                        if start_offset != partition.init_start_offset[0]:
+                            partition.first_offset = start_offset, now
                 except Exception as error:
                     KAFKA_LOG.exception(error)
                     KAFKA_LOG.error(
-                        f"Unable to update topic {topic.name} partition {partition.id} watermarks"
+                        f"Unable to update topic {topic.name} partition {_partition.id} watermarks"
                     )
             queue.task_done()
         else:

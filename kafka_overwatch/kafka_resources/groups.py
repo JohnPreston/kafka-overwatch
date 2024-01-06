@@ -44,6 +44,9 @@ def tidy_consumer_groups(
         for group in existing_groups_list:
             if group not in query_groups_list:
                 try:
+                    for topic in kafka_cluster.topics.values():
+                        if topic.consumer_groups and group in topic.consumer_groups:
+                            del topic.consumer_groups[group]
                     print(
                         f"Consumer group {group} no longer on cluster {kafka_cluster.name} metadata"
                     )
@@ -82,8 +85,15 @@ def set_update_cluster_consumer_groups(
             False,
         )
     if kafka_cluster.groups_describe_queue.qsize() == 0:
-        KAFKA_LOG.info(f"{kafka_cluster.name}: no consumer group to describe in queue.")
+        KAFKA_LOG.info(
+            f"{kafka_cluster.name} -  no consumer group to describe in queue."
+        )
         return
+    KAFKA_LOG.info(
+        f"{kafka_cluster.name} - {kafka_cluster.groups_describe_queue.qsize()}"
+        " CGs to retrieve metadata for."
+    )
+    KAFKA_LOG.debug(f"{kafka_cluster.name} - CG list len: {len(query_groups_list)}")
 
     for _ in range(1, kafka_cluster.cluster_brokers_count or NUM_THREADS):
         _thread = Thread(
@@ -97,14 +107,15 @@ def set_update_cluster_consumer_groups(
 
 
 def update_set_consumer_group_topics_partitions_offsets(
-    kafka_cluster: KafkaCluster, consumer_group: ConsumerGroup, groups_offsets: dict
+    kafka_cluster: KafkaCluster,
+    consumer_group: ConsumerGroup,
 ) -> None:
     """
     Groups topic partitions offsets per topic
     Assigns partitions offsets to the consumer group
     Maps consumer group to topic
     """
-    for _group, _future in groups_offsets.items():
+    for _group, _future in consumer_group.partitions_offsets.items():
         offsets_result = _future.result()
 
         __topic_partitions_new_offsets: dict = {}
@@ -139,19 +150,21 @@ def describe_update_consumer_groups(queue: Queue) -> None:
             KAFKA_LOG.debug(f"Describing consumer group {group} - {kafka_cluster.name}")
             try:
                 if group not in kafka_cluster.groups:
-                    kafka_cluster.groups[group] = ConsumerGroup(
+                    consumer_group = ConsumerGroup(
                         group_description.group_id,
                         group_description.members,
                         group_description.state,
                     )
-                consumer_group = kafka_cluster.groups[group]
-                group_offsets = wait_for_result(
+                    kafka_cluster.groups[group] = consumer_group
+                else:
+                    consumer_group: ConsumerGroup = kafka_cluster.groups[group]
+                    consumer_group.members = group_description.members
+                    consumer_group.state = group_description.state
+                consumer_group.partitions_offsets = wait_for_result(
                     kafka_cluster.admin_client.list_consumer_group_offsets(
-                        [ConsumerGroupTopicPartitions(group_description.group_id)]
+                        [ConsumerGroupTopicPartitions(group_description.group_id)],
+                        require_stable=True,
                     )
-                )
-                update_set_consumer_group_topics_partitions_offsets(
-                    kafka_cluster, consumer_group, group_offsets
                 )
             except Exception as error:
                 KAFKA_LOG.exception(error)

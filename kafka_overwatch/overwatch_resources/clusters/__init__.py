@@ -226,25 +226,21 @@ fi
     def render_report(self) -> None:
         KAFKA_LOG.info(f"Producing report for {self.name}")
         report = get_cluster_usage(self.name, self)
+        file_name = f"{self.name}.overwatch-report.json"
         if self.local_reports_directory_path:
+            file_path: str = path.abspath(
+                f"{self.local_reports_directory_path}/{file_name}"
+            )
             try:
-                with open(f"{self.local_reports_directory_path}.json", "w") as f:
+                with open(file_path, "w") as f:
                     f.write(json.dumps(asdict(report), indent=2))
-                KAFKA_LOG.info(f"Report saved to {self.local_reports_directory_path}")
+                KAFKA_LOG.info(f"Report saved to {file_path}")
             except PermissionError:
-                KAFKA_LOG.error(
-                    f"Permission denied to save report to {self.local_reports_directory_path}.json"
-                )
+                KAFKA_LOG.error(f"Permission denied to save report to {file_path}")
             except OSError:
-                KAFKA_LOG.error(
-                    f"IOError while saving report to {self.local_reports_directory_path}.json"
-                )
+                KAFKA_LOG.error(f"IOError while saving report to {file_path}")
             except Exception as error:
                 KAFKA_LOG.exception(error)
-                KAFKA_LOG.error(
-                    f"Error while saving report to {self.local_reports_directory_path}.json: {error}"
-                )
+                KAFKA_LOG.error(f"Error while saving report to {file_path}: {error}")
         if self.s3_report:
-            self.s3_report.upload(
-                json.dumps(asdict(report), indent=2), f"{self.name}.json"
-            )
+            self.s3_report.upload(json.dumps(asdict(report), indent=2), file_name)

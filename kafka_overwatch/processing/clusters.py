@@ -18,7 +18,10 @@ from datetime import timedelta as td
 
 import pandas
 
-from kafka_overwatch.kafka_resources.groups import set_update_cluster_consumer_groups
+from kafka_overwatch.kafka_resources.groups import (
+    set_update_cluster_consumer_groups,
+    update_set_consumer_group_topics_partitions_offsets,
+)
 from kafka_overwatch.kafka_resources.topics import describe_update_all_topics
 from kafka_overwatch.overwatch_resources.clusters import KafkaCluster
 
@@ -86,14 +89,19 @@ def process_cluster(
     ]
 
     while kafka_cluster.keep_running:
+        with kafka_cluster.groups_describe_latency.time():
+            set_update_cluster_consumer_groups(kafka_cluster)
         with kafka_cluster.topics_describe_latency.time():
             describe_update_all_topics(kafka_cluster)
+        for consumer_group in kafka_cluster.groups.values():
+            update_set_consumer_group_topics_partitions_offsets(
+                kafka_cluster, consumer_group
+            )
+
         kafka_cluster.cluster_topics_count.set(len(kafka_cluster.topics))
         kafka_cluster.cluster_partitions_count.set(
             sum([len(_topic.partitions) for _topic in kafka_cluster.topics.values()])
         )
-        with kafka_cluster.groups_describe_latency.time():
-            set_update_cluster_consumer_groups(kafka_cluster)
         kafka_cluster.cluster_consumer_groups_count.set(len(kafka_cluster.groups))
         if (
             kafka_cluster.config.topics_backup_config

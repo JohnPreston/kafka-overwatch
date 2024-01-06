@@ -25,6 +25,7 @@ class ConsumerGroup:
         self._state = init_state
         self._members: list = []
         self._init_time = dt.utcnow()
+        self._partitions_offsets = None
 
     def __repr__(self):
         return self._group_id
@@ -35,6 +36,14 @@ class ConsumerGroup:
     @property
     def group_id(self):
         return self._group_id
+
+    @property
+    def partitions_offsets(self):
+        return self._partitions_offsets
+
+    @partitions_offsets.setter
+    def partitions_offsets(self, value):
+        self._partitions_offsets = value
 
     @property
     def state(self) -> ConsumerGroupState:
@@ -84,23 +93,6 @@ class ConsumerGroup:
                 _overwatch_topic_partition = overwatch_topic.partitions[
                     partition.partition
                 ]
-                if partition.offset < 0:
-                    print("CG PARTITION", partition, partition)
-                    print(
-                        "TOPIC PARTITION",
-                        _overwatch_topic_partition.end_offset,
-                        _overwatch_topic_partition,
-                    )
-
-                    KAFKA_LOG.info(
-                        "{} - {}: {}.{} reported offset is negative. Could indicate changes on the topic.".format(
-                            overwatch_topic.cluster.name,
-                            self.group_id,
-                            overwatch_topic.name,
-                            _overwatch_topic_partition.partition_id,
-                        )
-                    )
-                    continue
                 if _overwatch_topic_partition.total_messages_count == 0:
                     KAFKA_LOG.debug(
                         "{} - {}: {}.{} No messages on partition. Skipping for consumer lag.".format(
@@ -111,15 +103,26 @@ class ConsumerGroup:
                         )
                     )
                     continue
+                if partition.offset < 0:
+                    KAFKA_LOG.debug(
+                        "{} - {} - No committed offset found for topic:partition {}:{}".format(
+                            overwatch_topic.cluster.name,
+                            self.group_id,
+                            overwatch_topic.name,
+                            _overwatch_topic_partition.partition_id,
+                        )
+                    )
+                    break
                 _partition_lag: int = (
                     _overwatch_topic_partition.end_offset[0] - partition.offset
                 )
                 total_lag += _partition_lag
                 partitions_lag.append((partition.partition, _partition_lag))
-            lag[overwatch_topic.name] = {
-                "total": total_lag,
-                "partitions": partitions_lag,
-            }
+            if total_lag and partitions_lag:
+                lag[overwatch_topic.name] = {
+                    "total": total_lag,
+                    "partitions": partitions_lag,
+                }
         if topic_name and topic_name in lag:
             return lag[topic_name]
         return lag

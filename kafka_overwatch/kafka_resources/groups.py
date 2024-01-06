@@ -44,6 +44,9 @@ def tidy_consumer_groups(
         for group in existing_groups_list:
             if group not in query_groups_list:
                 try:
+                    for topic in kafka_cluster.topics.values():
+                        if topic.consumer_groups and group in topic.consumer_groups:
+                            del topic.consumer_groups[group]
                     print(
                         f"Consumer group {group} no longer on cluster {kafka_cluster.name} metadata"
                     )
@@ -104,14 +107,15 @@ def set_update_cluster_consumer_groups(
 
 
 def update_set_consumer_group_topics_partitions_offsets(
-    kafka_cluster: KafkaCluster, consumer_group: ConsumerGroup, groups_offsets: dict
+    kafka_cluster: KafkaCluster,
+    consumer_group: ConsumerGroup,
 ) -> None:
     """
     Groups topic partitions offsets per topic
     Assigns partitions offsets to the consumer group
     Maps consumer group to topic
     """
-    for _group, _future in groups_offsets.items():
+    for _group, _future in consumer_group.partitions_offsets.items():
         offsets_result = _future.result()
 
         __topic_partitions_new_offsets: dict = {}
@@ -141,9 +145,6 @@ def describe_update_consumer_groups(queue: Queue) -> None:
     while 42:
         if not queue.empty():
             desc_future, kafka_cluster = queue.get()
-            if not kafka_cluster.keep_running:
-                KAFKA_LOG.warning("Kafka cluster processing interruption requested.")
-                return
             group_description: ConsumerGroupDescription = desc_future.result()
             group = group_description.group_id
             KAFKA_LOG.debug(f"Describing consumer group {group} - {kafka_cluster.name}")
@@ -159,13 +160,11 @@ def describe_update_consumer_groups(queue: Queue) -> None:
                     consumer_group: ConsumerGroup = kafka_cluster.groups[group]
                     consumer_group.members = group_description.members
                     consumer_group.state = group_description.state
-                group_offsets = wait_for_result(
+                consumer_group.partitions_offsets = wait_for_result(
                     kafka_cluster.admin_client.list_consumer_group_offsets(
-                        [ConsumerGroupTopicPartitions(group_description.group_id)]
+                        [ConsumerGroupTopicPartitions(group_description.group_id)],
+                        require_stable=True,
                     )
-                )
-                update_set_consumer_group_topics_partitions_offsets(
-                    kafka_cluster, consumer_group, group_offsets
                 )
             except Exception as error:
                 KAFKA_LOG.exception(error)

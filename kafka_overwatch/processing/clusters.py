@@ -89,6 +89,7 @@ def process_cluster(
     ]
 
     while kafka_cluster.keep_running:
+        processing_start = dt.utcnow()
         with kafka_cluster.groups_describe_latency.time():
             set_update_cluster_consumer_groups(kafka_cluster)
         with kafka_cluster.topics_describe_latency.time():
@@ -110,8 +111,17 @@ def process_cluster(
             kafka_cluster.render_restore_files()
         measure_consumer_group_lags(kafka_cluster, consumer_group_lag_gauge)
         generate_cluster_report(kafka_cluster)
-
-        for _ in range(1, kafka_cluster.config.cluster_scan_interval_in_seconds):
-            if not kafka_cluster.keep_running:
-                break
-            time.sleep(1)
+        elapsed_time = int((dt.utcnow() - processing_start).total_seconds())
+        time_to_wait = int(
+            kafka_cluster.config.cluster_scan_interval_in_seconds - elapsed_time
+        )
+        if time_to_wait <= 0:
+            print(
+                f"{kafka_cluster.name} - interval set to {kafka_cluster.config.cluster_scan_interval_in_seconds}"
+                ", however it takes {elapsed_time}s to complete the scan. Consider changing scan interval"
+            )
+        else:
+            for _ in range(1, time_to_wait):
+                if not kafka_cluster.keep_running:
+                    break
+                time.sleep(1)

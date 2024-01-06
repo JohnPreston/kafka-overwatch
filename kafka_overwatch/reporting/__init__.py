@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from dacite import from_dict
 
 if TYPE_CHECKING:
+    from pandas import DataFrame
     from kafka_overwatch.overwatch_resources.clusters import KafkaCluster
 
 from kafka_overwatch.specs.report import (
@@ -18,19 +19,25 @@ from kafka_overwatch.specs.report import (
     Statistics,
 )
 
-from .topic_waste_categories import (
-    generate_cluster_topics_pd_dataframe,
-    process_cluster_topic_df,
-)
+from .topics import generate_cluster_topics_pd_dataframe, process_cluster_topic_df
 
 
-def get_cluster_usage(cluster_name: str, kafka_cluster: KafkaCluster) -> ClusterReport:
+def get_cluster_usage(
+    cluster_name: str, kafka_cluster: KafkaCluster
+) -> tuple[ClusterReport, DataFrame]:
     """
     Based on the topics to monitor, as per the configuration, evaluates the usage of the topics identified.
 
     """
     topics_df = generate_cluster_topics_pd_dataframe(kafka_cluster)
     topics_df["partitions"] = topics_df["partitions"].astype(int)
+    topics_df["eval_elapsed_time"] = topics_df["eval_elapsed_time"].astype(int)
+    topics_df["messages_per_seconds"] = (
+        topics_df["new_messages"] / topics_df["eval_elapsed_time"]
+    )
+    topics_df["messages_per_seconds"] = (
+        topics_df["messages_per_seconds"].fillna(0).astype(int)
+    )
 
     topic_categories: dict = process_cluster_topic_df(topics_df)
     estimate = from_dict(
@@ -57,4 +64,6 @@ def get_cluster_usage(cluster_name: str, kafka_cluster: KafkaCluster) -> Cluster
         statistics=cluster_stats,
         estimated_waste=estimate,
     )
-    return cluster
+    print(f"{kafka_cluster.name} - statistics")
+    print(topics_df.describe())
+    return cluster, topics_df

@@ -12,7 +12,6 @@ import pandas as pd
 from dacite import from_dict
 from pandas import DataFrame
 
-from kafka_overwatch.overwatch_resources.clusters.tools import output_dataframe
 from kafka_overwatch.specs.report import TopicWasteCategory
 
 
@@ -21,26 +20,6 @@ def generate_cluster_topics_pd_dataframe(kafka_cluster: KafkaCluster) -> DataFra
     for topic in kafka_cluster.topics.values():
         topics_data.append(topic.pd_frame_data)
     df = DataFrame(topics_data)
-    export_to_mime: dict = {"csv": "text/csv", "json": "application/json"}
-    if (
-        kafka_cluster.config.reporting_config.output_formats
-        and not kafka_cluster.config.reporting_config.output_formats.pandas_dataframe
-    ):
-        return df
-    for (
-        export_type
-    ) in kafka_cluster.config.reporting_config.output_formats.pandas_dataframe:
-        export_fn = None
-        if hasattr(df, f"to_{export_type}"):
-            export_fn = getattr(df, f"to_{export_type}")
-
-        if export_type in export_to_mime and export_fn:
-            output_dataframe(
-                kafka_cluster,
-                export_fn(),
-                f"{kafka_cluster.name}.topics_dataframe.{export_type}",
-                mime_type=export_to_mime[export_type],
-            )
     return df
 
 
@@ -146,6 +125,12 @@ if __name__ == "__main__":
 
     topics_df: pd.DataFrame = pd.read_csv(
         environ.get("TEST_INPUT_CSV_FILE", "test_data/nonprod.dataframe.csv")
+    )
+    topics_df["messages_per_seconds"] = (
+        topics_df["new_messages"] / topics_df["eval_elapsed_time"]
+    )
+    topics_df["messages_per_seconds"] = (
+        topics_df["messages_per_seconds"].fillna(0).astype(int)
     )
     # print(df.to_csv())
     cats = process_cluster_topic_df(topics_df)

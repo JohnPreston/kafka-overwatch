@@ -9,7 +9,8 @@ from os import makedirs, path
 from queue import Queue
 from typing import TYPE_CHECKING
 
-from kafka_overwatch.overwatch_resources.clusters.reporting import get_cluster_usage
+from kafka_overwatch.reporting import get_cluster_usage
+from kafka_overwatch.reporting.tools import export_topics_df
 
 if TYPE_CHECKING:
     from confluent_kafka.admin import AdminClient
@@ -36,7 +37,6 @@ from kafka_overwatch.specs.config import (
     ClusterTopicBackupConfig,
     Exports,
 )
-from kafka_overwatch.specs.report import ClusterReport
 
 
 class KafkaCluster:
@@ -225,7 +225,8 @@ fi
 
     def render_report(self) -> None:
         KAFKA_LOG.info(f"Producing report for {self.name}")
-        report = get_cluster_usage(self.name, self)
+        report, topics_df = get_cluster_usage(self.name, self)
+        export_topics_df(self, topics_df)
         file_name = f"{self.name}.overwatch-report.json"
         if self.local_reports_directory_path:
             file_path: str = path.abspath(

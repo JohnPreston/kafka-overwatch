@@ -118,7 +118,7 @@ def process_cluster(
         if time_to_wait <= 0:
             print(
                 f"{kafka_cluster.name} - interval set to {kafka_cluster.config.cluster_scan_interval_in_seconds}"
-                ", however it takes {elapsed_time}s to complete the scan. Consider changing scan interval"
+                f", however it takes {elapsed_time}s to complete the scan. Consider changing scan interval"
             )
         else:
             for _ in range(1, time_to_wait):

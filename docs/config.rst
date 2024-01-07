@@ -3,6 +3,12 @@
     :description: Kafka Overwatch
     :keywords: kafka, observability, cost-savings
 
+.. _input_config:
+
+=======================
+Input Configuration
+=======================
+
 JSON Schema
 =============
 

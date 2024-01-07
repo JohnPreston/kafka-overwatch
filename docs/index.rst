@@ -11,46 +11,7 @@ Welcome to Kafka Overwatch documentation
 
 |CODE_STYLE| |TDD| |BDD|
 
-|QUALITY|
-
-TL;DR
-======
-
-This microservice monitors Kafka topics in intervals, examining offsets, consumer groups, and lag to identify active topics with new messages.
-It exposes metrics for validation and generates a user-friendly report, helping users discern actively utilized topics from dormant ones.
-
-It can be monitor multiple Kafka clusters in-parallel, using different configurations and settings.
-
-Features
-==========
-
-* Generates a usage report on topics
-* Exposes metrics via prometheus
-
-    * Topics count
-    * Partitions count
-    * Number of new messages (measured with topic offsets)
-
-* AWS Secret integration for client config values
-
-Extras
---------
-
-Here are some extra features that serve additional needs
-
-* Generates commands script to re-create all the topics in case of DR (store local or to S3)
-
-
-
-Input configuration
-====================
-
-Before running it, you need to define an input configuration file, with the different Kafka clusters you wish to scan.
-Head to :ref:`input_config` to check the input specifications.
-
-For example below, as-used in the ``docker-compose.override.yaml``
-
-.. literalinclude:: ../config.local.yaml
+|QUALITY| |BUILD|
 
 
 Install | Deploy
@@ -78,7 +39,7 @@ With python
     python3 -m pip install kafka-overwatch --user
 
 
-.. |BUILD| image::
+.. |BUILD| image:: https://codebuild.eu-west-1.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiWjIrbSsvdC9jZzVDZ3N5dVNiMlJCOUZ4M0FQNFZQeXRtVmtQbWIybUZ1ZmV4NVJEdG9yZURXMk5SVVFYUjEwYXpxUWV1Y0ZaOEcwWS80M0pBSkVYQjg0PSIsIml2UGFyYW1ldGVyU3BlYyI6Ik1rT0NaR05yZHpTMklCT0MiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main
 
 
 .. |PYPI_VERSION| image:: https://img.shields.io/pypi/v/kafka-overwatch.svg

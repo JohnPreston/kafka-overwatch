@@ -13,14 +13,15 @@
     "global": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Global settings. Apply to all clusters",
+      "description": "Global settings. Defines global default values that can be overriden for each cluster.",
       "required": [
         "cluster_scan_interval_in_seconds"
       ],
       "properties": {
         "cluster_scan_interval_in_seconds": {
           "$ref": "#/definitions/ClusterScanIntervalInSeconds",
-          "default": 60
+          "default": 60,
+          "description": "Default topics & consumer groups scan interval"
         }
       }
     },
@@ -41,15 +42,17 @@
       "patternProperties": {
         "x-": {}
       },
-      "description": "Allows to define a Kafka SaaS provider and perform discovery of existing clusters to scan",
+      "description": "Allows to define a Kafka SaaS provider and perform discovery of existing clusters to scan. (Not yet implemented)",
       "properties": {
         "aiven": {
         },
         "aws_msk": {
-          "$ref": "#/definitions/MskProvider"
+          "$ref": "#/definitions/MskProvider",
+          "description": "AWS MSK Clusters discovery"
         },
         "confluent_cloud": {
-          "$ref": "#/definitions/ConfluentProvider"
+          "$ref": "#/definitions/ConfluentProvider",
+          "description": "Confluent Cloud environments & clusters discovery."
         },
         "conduktor_gateway": {
           "type": "object",
@@ -66,7 +69,8 @@
     },
     "prometheus": {},
     "notification_channels": {
-      "$ref": "#/definitions/NotificationChannels"
+      "$ref": "#/definitions/NotificationChannels",
+      "description": "Allows to define notification channels for reporting (not yet implemented)."
     },
     "aws_emf": {
       "type": "object",
@@ -87,18 +91,6 @@
     }
   },
   "definitions": {
-    "SaaSProviderAwsSecretsManager": {
-      "type": "object",
-      "properties": {
-        "secret_id": {
-          "type": "string",
-          "description": "Name or ARN of secret to use to store the key. If ARN is detected, existing secret content will be updated. If name is provided but not found, creates new secret."
-        },
-        "iam_override": {
-          "$ref": "#/definitions/IamOverride"
-        }
-      }
-    },
     "aws_emf": {
       "type": "object",
       "required": [
@@ -535,6 +527,18 @@
               }
             }
           }
+        }
+      }
+    },
+    "SaaSProviderAwsSecretsManager": {
+      "type": "object",
+      "properties": {
+        "secret_id": {
+          "type": "string",
+          "description": "Name or ARN of secret to use to store the key. If ARN is detected, existing secret content will be updated. If name is provided but not found, creates new secret."
+        },
+        "iam_override": {
+          "$ref": "#/definitions/IamOverride"
         }
       }
     }

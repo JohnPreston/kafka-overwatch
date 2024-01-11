@@ -6,21 +6,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from kafka_overwatch.overwatch_resources.clusters import KafkaCluster
+    pass
 
 import pandas as pd
 from dacite import from_dict
-from pandas import DataFrame
 
 from kafka_overwatch.specs.report import TopicWasteCategory
-
-
-def generate_cluster_topics_pd_dataframe(kafka_cluster: KafkaCluster) -> DataFrame:
-    topics_data: list[dict] = []
-    for topic in kafka_cluster.topics.values():
-        topics_data.append(topic.pd_frame_data)
-    df = DataFrame(topics_data)
-    return df
 
 
 def process_cluster_topic_df(topics_df: pd.DataFrame) -> dict:
@@ -118,29 +109,3 @@ def process_cluster_topic_df(topics_df: pd.DataFrame) -> dict:
     )
     topic_categories["no_cgs_and_no_new_messages"] = no_cgs_and_no_new_messages_category
     return topic_categories
-
-
-if __name__ == "__main__":
-    from os import environ
-
-    topics_df: pd.DataFrame = pd.read_csv(
-        environ.get("TEST_INPUT_CSV_FILE", "test_data/nonprod.dataframe.csv")
-    )
-    topics_df["messages_per_seconds"] = (
-        topics_df["new_messages"] / topics_df["eval_elapsed_time"]
-    )
-    topics_df["messages_per_seconds"] = (
-        topics_df["messages_per_seconds"].fillna(0).astype(int)
-    )
-    # print(df.to_csv())
-    cats = process_cluster_topic_df(topics_df)
-    new_messages_percentile_value = topics_df["new_messages"].quantile(0.75)
-    total_messages_percentile_value = topics_df["total_messages"].quantile(0.75)
-    most_active_topics_df = topics_df[
-        (topics_df["new_messages"] > new_messages_percentile_value)
-        & (topics_df["total_messages"] > total_messages_percentile_value)
-        & (topics_df["active_groups"] > 0)
-    ].reset_index()
-    print(most_active_topics_df.to_csv())
-    most_active_topics = most_active_topics_df["name"].values.tolist()
-    print(most_active_topics, type(most_active_topics))

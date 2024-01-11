@@ -19,11 +19,12 @@ if TYPE_CHECKING:
     from kafka_overwatch.overwatch_resources.topics import Topic
     from kafka_overwatch.config.config import OverwatchConfig
 
-import signal
+import threading
 from datetime import datetime as dt
 from datetime import timedelta as td
 
 from confluent_kafka.admin import KafkaError
+from pandas import DataFrame
 from prometheus_client import Gauge, Summary
 from retry import retry
 
@@ -45,15 +46,13 @@ class KafkaCluster:
     ):
         self.name = name
         self.keep_running: bool = True
+        self.stop_flag = threading.Event()
 
         if not config.reporting_config.exports:
             config.reporting_config.exports = Exports()
 
         if not config.topics_backup_config:
             config.topics_backup_config = ClusterTopicBackupConfig()
-
-        signal.signal(signal.SIGINT, self.exit_gracefully)
-        signal.signal(signal.SIGTERM, self.exit_gracefully)
 
         self._cluster_config = config
         self._overwatch_config = overwatch_config
@@ -174,27 +173,7 @@ class KafkaCluster:
             f"Cluster {self.name} - Attempt to exit gracefully due to signal/interruption - {pid}"
         )
         self.keep_running = False
-        if self.topics_watermarks_queue.qsize() != 0:
-            KAFKA_LOG.info(f"{self.name} - Clearing non-empty topic describe queue")
-            with self.topics_watermarks_queue.mutex:
-                self.topics_watermarks_queue.queue.clear()
-                self.topics_watermarks_queue.all_tasks_done.notify_all()
-                self.topics_watermarks_queue.unfinished_tasks = 0
-        if self.groups_describe_queue.qsize() != 0:
-            KAFKA_LOG.info(f"{self.name} - Clearing non-empty groups describe queue")
-            with self.groups_describe_queue.mutex:
-                self.groups_describe_queue.queue.clear()
-                self.groups_describe_queue.all_tasks_done.notify_all()
-                self.groups_describe_queue.unfinished_tasks = 0
-
-        try:
-            self.consumer_client.close()
-        except AttributeError:
-            pass
-        try:
-            self.admin_client.close()
-        except AttributeError:
-            pass
+        self.stop_flag.set()
 
     def render_restore_files(self) -> None:
         """
@@ -223,9 +202,9 @@ fi
                 bash_script, f"{self.name}_restore.sh", "application/x-sh"
             )
 
-    def render_report(self) -> None:
+    def render_report(self, topics_df: DataFrame) -> None:
         KAFKA_LOG.info(f"Producing report for {self.name}")
-        report, topics_df = get_cluster_usage(self.name, self)
+        report = get_cluster_usage(self.name, self, topics_df)
         export_topics_df(self, topics_df)
         file_name = f"{self.name}.overwatch-report.json"
         if self.local_reports_directory_path:
@@ -245,3 +224,20 @@ fi
                 KAFKA_LOG.error(f"Error while saving report to {file_path}: {error}")
         if self.s3_report:
             self.s3_report.upload(json.dumps(asdict(report), indent=2), file_name)
+
+
+def generate_cluster_topics_pd_dataframe(kafka_cluster: KafkaCluster) -> DataFrame:
+    topics_data: list[dict] = []
+    for topic in kafka_cluster.topics.values():
+        topics_data.append(topic.pd_frame_data)
+    topics_df = DataFrame(topics_data)
+    topics_df["partitions"] = topics_df["partitions"].astype(int)
+    topics_df["eval_elapsed_time"] = topics_df["eval_elapsed_time"].astype(int)
+    topics_df["messages_per_seconds"] = (
+        topics_df["new_messages"] / topics_df["eval_elapsed_time"]
+    )
+    topics_df["messages_per_seconds"] = (
+        topics_df["messages_per_seconds"].fillna(0).astype(int)
+    )
+
+    return topics_df

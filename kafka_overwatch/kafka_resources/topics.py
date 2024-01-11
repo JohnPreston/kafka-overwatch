@@ -8,8 +8,10 @@ from typing import TYPE_CHECKING
 from retry import retry
 
 if TYPE_CHECKING:
+    from confluent_kafka.admin import TopicDescription
     from kafka_overwatch.overwatch_resources.clusters import KafkaCluster
 
+import concurrent.futures
 import re
 import threading
 from datetime import datetime as dt
@@ -17,6 +19,7 @@ from datetime import datetime as dt
 from confluent_kafka import TopicCollection, TopicPartition
 from confluent_kafka.admin import AclOperation, ConfigResource, ResourceType
 from confluent_kafka.error import KafkaError
+from retry.api import retry, retry_call
 
 from kafka_overwatch.config.logging import KAFKA_LOG
 from kafka_overwatch.config.threads_settings import NUM_THREADS
@@ -55,40 +58,97 @@ def get_filtered_topics_list(cluster: KafkaCluster) -> list[str]:
     return final_list
 
 
+@retry((KafkaError,), tries=5)
+def get_topic_descriptions(
+    topic_names: list[str], admin_client
+) -> dict[str, TopicDescription]:
+    desc_topics = {
+        topic_name: topic_desc.result()
+        for topic_name, topic_desc in wait_for_result(
+            admin_client.describe_topics(
+                TopicCollection([topic_name for topic_name in topic_names]),
+                include_authorized_operations=True,
+            )
+        ).items()
+    }
+    return desc_topics
+
+
+@retry((KafkaError,), tries=5)
+def get_topics_list(kafka_cluster: KafkaCluster) -> list[str]:
+    try:
+        topic_names: list[str] = list(
+            kafka_cluster.admin_client.list_topics().topics.keys()
+        )
+        return topic_names
+    except Exception as error:
+        KAFKA_LOG.error(f"{kafka_cluster.name} - Failed to list topics: {error}")
+        raise
+
+
 def describe_update_all_topics(
-    cluster: KafkaCluster,
+    kafka_cluster: KafkaCluster,
 ) -> None:
     """
     Lists all topics
     """
-    topic_names: list[str] = list(cluster.admin_client.list_topics().topics.keys())
-    desc_topics = wait_for_result(
-        cluster.admin_client.describe_topics(
-            TopicCollection([topic_name for topic_name in topic_names]),
-            include_authorized_operations=True,
-        )
+    topic_names = get_topics_list(kafka_cluster)
+    desc_topics = retry_call(
+        get_topic_descriptions, fargs=[topic_names, kafka_cluster.admin_client]
     )
-    for _cluster_topic_name in list(cluster.topics.keys()):
+    for _cluster_topic_name in list(kafka_cluster.topics.keys()):
         if _cluster_topic_name not in topic_names:
             KAFKA_LOG.warning(
-                f"Topic {_cluster_topic_name} no longer in cluster {cluster.name} metadata. Clearing"
+                f"Topic {_cluster_topic_name} no longer in cluster {kafka_cluster.name} metadata. Clearing"
             )
-            _to_clear = cluster.topics[_cluster_topic_name]
+            _to_clear = kafka_cluster.topics[_cluster_topic_name]
             for _partition in _to_clear.partitions.values():
                 _partition.cleanup()
-            del cluster.topics[_cluster_topic_name]
+            del kafka_cluster.topics[_cluster_topic_name]
 
     if desc_topics:
-        describe_update_topics(cluster, desc_topics)
+        describe_update_topics(kafka_cluster, desc_topics)
     else:
-        KAFKA_LOG.info(f"No topics matched for {cluster.name}")
+        KAFKA_LOG.info(f"No topics matched for {kafka_cluster.name}")
 
 
-def describe_update_topics(cluster: KafkaCluster, desc_topics: dict) -> None:
+def retry_kafka(future, futures_to_data, executor):
+    # get the associated data for the task
+    data = futures_to_data[future]
+    # submit the task again
+    _retry = executor.submit(init_set_partitions, data)
+    # store so we can track the retries
+    futures_to_data[_retry] = data
+    return data
+
+
+def update_set_topic_config(kafka_cluster, topics_configs_resources) -> None:
+    if not topics_configs_resources:
+        return
+    try:
+        topics_config = wait_for_result(
+            kafka_cluster.admin_client.describe_configs(topics_configs_resources)
+        )
+        for __name, __topic in topics_config.items():
+            if __name.name in kafka_cluster.topics:
+                kafka_cluster.topics[__name.name].config = __topic.result()
+
+    except KafkaError as error:
+        print(f"{kafka_cluster.name} - DescribeConfigs on topics failed: {error}")
+
+
+def define_topic_jobs(
+    kafka_cluster: KafkaCluster, desc_topics: dict
+) -> tuple[dict, list]:
+    """
+    Goes over all the topic configurations, and if authorization allows for describe configs, plans
+    for the list of configurations to return.
+    Returns the dict of topic description jobs to perform, and the topic descriptions list.
+    """
     topics_configs_resources = []
-
-    for topic in desc_topics.values():
-        _topic = topic.result()
+    topic_jobs: dict[str, list] = {}
+    now = dt.utcnow()
+    for _topic_name, _topic in desc_topics.items():
         if (
             hasattr(_topic, "authorized_operations")
             and AclOperation.DESCRIBE_CONFIGS in _topic.authorized_operations
@@ -98,45 +158,53 @@ def describe_update_topics(cluster: KafkaCluster, desc_topics: dict) -> None:
             )
         else:
             KAFKA_LOG.debug(
-                f"Cluster {cluster.name} - Topic {_topic.name}: Not authorized to perform DescribeConfig."
+                f"Cluster {kafka_cluster.name} - Topic {_topic.name}: Not authorized to perform DescribeConfig."
             )
 
-        if _topic.name not in cluster.topics:
-            _topic_obj = Topic(_topic.name, cluster)
-            cluster.topics[_topic.name] = _topic_obj
+        if _topic.name not in kafka_cluster.topics:
+            _topic_obj = Topic(_topic.name, kafka_cluster)
+            kafka_cluster.topics[_topic.name] = _topic_obj
         else:
-            _topic_obj = cluster.topics[_topic.name]
-        cluster.topics_watermarks_queue.put(
-            [_topic_obj, cluster.consumer_client, _topic, dt.utcnow()], False
-        )
-    KAFKA_LOG.info(
-        f"{cluster.name} - {cluster.topics_watermarks_queue.qsize()} topic jobs to do."
-    )
-    KAFKA_LOG.debug(desc_topics.keys())
-    if cluster.topics_watermarks_queue.qsize() == 0:
-        return
-    topics_watermark_threads: list[threading.Thread] = []
-    for _ in range(1, cluster.cluster_brokers_count or NUM_THREADS):
-        _thread = threading.Thread(
-            target=init_set_partitions,
-            daemon=True,
-            args=(cluster.topics_watermarks_queue,),
-        )
-        _thread.start()
-        topics_watermark_threads.append(_thread)
-    cluster.topics_watermarks_queue.join()
+            _topic_obj = kafka_cluster.topics[_topic.name]
+        topic_jobs[_topic_name] = [
+            _topic_obj,
+            kafka_cluster.consumer_client,
+            _topic,
+            now,
+        ]
 
-    if topics_configs_resources:
-        try:
-            topics_config = wait_for_result(
-                cluster.admin_client.describe_configs(topics_configs_resources)
-            )
-            for __name, __topic in topics_config.items():
-                if __name.name in cluster.topics:
-                    cluster.topics[__name.name].config = __topic.result()
+    return topic_jobs, topics_configs_resources
 
-        except KafkaError as error:
-            print(f"{cluster.name} - DescribeConfigs on topics failed: {error}")
+
+def describe_update_topics(kafka_cluster: KafkaCluster, desc_topics: dict) -> None:
+    """
+    Leverages threads to retrieve the topic offset watermarks which cannot be sent in a single
+    call to Kafka.
+    """
+    topic_jobs, topics_configs_resources = define_topic_jobs(kafka_cluster, desc_topics)
+    _tasks = len(topic_jobs)
+    completed: int = 0
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=kafka_cluster.cluster_brokers_count
+    ) as executor:
+        futures_to_data: dict[concurrent.futures.Future, list] = {
+            executor.submit(init_set_partitions, *job_params): job_params
+            for job_params in topic_jobs.values()
+        }
+
+        while completed < _tasks:
+            for _future in concurrent.futures.as_completed(futures_to_data):
+                if not kafka_cluster.keep_running or kafka_cluster.stop_flag.is_set():
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    break
+                if _future.exception():
+                    data = retry_kafka(_future, futures_to_data, executor)
+                    print(f"Failure, retrying {data}")
+                else:
+                    KAFKA_LOG.debug(_future.result())
+                    completed += 1
+                futures_to_data.pop(_future)
+    update_set_topic_config(kafka_cluster, topics_configs_resources)
 
 
 @retry((KafkaError,), tries=10, delay=5, backoff=2, jitter=(2, 5), logger=KAFKA_LOG)
@@ -152,35 +220,37 @@ def get_topic_partition_watermarks(consumer_client, topic_name, partition_id):
         return None, None
 
 
-def init_set_partitions(queue):
-    while 42:
-        if not queue.empty():
-            topic_obj, consumer_client, topic, now = queue.get()
-            partitions = topic.partitions
-            for _partition in partitions:
-                try:
-                    start_offset, end_offset = get_topic_partition_watermarks(
-                        consumer_client, topic.name, _partition.id
-                    )
-                    if start_offset is None or end_offset is None:
-                        KAFKA_LOG.debug("No start offset or end offset data retrieved")
-                        continue
-                    if _partition.id not in topic_obj.partitions:
-                        partition = Partition(
-                            topic_obj, _partition.id, start_offset, end_offset, now
-                        )
-                        topic_obj.partitions[_partition.id] = partition
-                    else:
-                        partition = topic_obj.partitions[_partition.id]
-                        partition.end_offset = end_offset, now
-                        if start_offset != partition.init_start_offset[0]:
-                            partition.first_offset = start_offset, now
-                except Exception as error:
-                    KAFKA_LOG.exception(error)
-                    KAFKA_LOG.error(
-                        f"Unable to update topic {topic.name} partition {_partition.id} watermarks"
-                    )
-            queue.task_done()
-        else:
-            KAFKA_LOG.debug("Topic watermark worker - stopping")
-            return
+# def init_set_partitions(queue):
+def init_set_partitions(topic_obj: Topic, consumer_client, topic, now):
+    # while 42:
+    #     if not queue.empty():
+    #         topic_obj, consumer_client, topic, now = queue.get()
+    partitions = topic.partitions
+    for _partition in partitions:
+        try:
+            start_offset, end_offset = get_topic_partition_watermarks(
+                consumer_client, topic.name, _partition.id
+            )
+            if start_offset is None or end_offset is None:
+                KAFKA_LOG.debug("No start offset or end offset data retrieved")
+                continue
+            if _partition.id not in topic_obj.partitions:
+                partition = Partition(
+                    topic_obj, _partition.id, start_offset, end_offset, now
+                )
+                topic_obj.partitions[_partition.id] = partition
+            else:
+                partition = topic_obj.partitions[_partition.id]
+                partition.end_offset = end_offset, now
+                if start_offset != partition.init_start_offset[0]:
+                    partition.first_offset = start_offset, now
+        except Exception as error:
+            KAFKA_LOG.exception(error)
+            KAFKA_LOG.error(
+                f"Unable to update topic {topic.name} partition {_partition.id} watermarks"
+            )
+    #     queue.task_done()
+    # else:
+    #     KAFKA_LOG.debug("Topic watermark worker - stopping")
+    #     return
+    return f"{topic_obj.name} - {(dt.utcnow() - now).total_seconds()}"

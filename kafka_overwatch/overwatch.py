@@ -8,9 +8,11 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from kafka_overwatch.config.config import OverwatchConfig
 
+import concurrent.futures
 import signal
 import threading
-from multiprocessing import Process
+from functools import partial
+from multiprocessing import Event
 from time import sleep
 
 from kafka_overwatch.config.logging import KAFKA_LOG
@@ -19,7 +21,6 @@ from kafka_overwatch.processing.clusters import process_cluster
 
 
 class KafkaOverwatchService:
-
     """
     Main service which starts the prometheus server and the processes for each
     Kafka cluster to be processed independently.
@@ -32,8 +33,7 @@ class KafkaOverwatchService:
 
     def __init__(self, config: OverwatchConfig) -> None:
         self._config = config
-        self.keep_running = 42
-        self.processes: list[Process] = []
+        self.stop_event = Event()
         signal.signal(signal.SIGINT, self.exit_gracefully)
         signal.signal(signal.SIGTERM, self.exit_gracefully)
 
@@ -52,29 +52,30 @@ class KafkaOverwatchService:
 
     def start(self):
         KAFKA_LOG.info("Starting Kafka Overwatch")
-        KAFKA_LOG.info(f"CONCURRENT_THREADS for processing set to {NUM_THREADS}")
-        try:
-            self.init_system()
-            for (
-                cluster_name,
-                cluster_config,
-            ) in self.config.input_config.clusters.items():
-                _cluster_process = Process(
-                    target=process_cluster,
-                    args=(
-                        cluster_name,
-                        cluster_config,
-                        self.config,
-                    ),
-                )
-                self.processes.append(_cluster_process)
-                _cluster_process.start()
+        # KAFKA_LOG.info(f"CONCURRENT_PROCESSES for processing set to {NUM_PROCESSES}")
+        self.init_system()
+        clusters_jobs = []
+        for (
+            cluster_name,
+            cluster_config,
+        ) in self.config.input_config.clusters.items():
+            clusters_jobs.append([cluster_name, cluster_config, self.config])
 
-            while self.keep_running:
-                sleep(1)
-
-        except KeyboardInterrupt:
-            self.exit_gracefully(None, None)
+        with concurrent.futures.ProcessPoolExecutor(
+            max_workers=len(self.config.input_config.clusters)
+        ) as executor:
+            futures_to_data: dict[concurrent.futures.Future, list] = {
+                executor.submit(process_cluster, *cluster_job): cluster_job
+                for cluster_job in clusters_jobs
+            }
+            try:
+                while not self.stop_event.is_set():
+                    concurrent.futures.wait(futures_to_data, timeout=10)
+            except KeyboardInterrupt:
+                for _future in futures_to_data:
+                    _future.cancel()
+                executor.shutdown(wait=True, cancel_futures=True)
+        return
 
     def exit_gracefully(self, pid, frame):
         """
@@ -83,16 +84,4 @@ class KafkaOverwatchService:
         from prometheus_client.multiprocess import mark_process_dead
 
         KAFKA_LOG.warning(f"Exiting gracefully due to signal/interruption - {pid}")
-        self.keep_running = False
-        KAFKA_LOG.info(
-            f"{threading.get_native_id()} "
-            f"- Signaling child processes {[_p.pid for _p in self.processes]}"
-        )
-        for process in self.processes:
-            if process.is_alive():
-                KAFKA_LOG.info(
-                    f"Parent {threading.get_native_id()} - Sending SIGTERM to {process.pid}"
-                )
-                process.terminate()
-                process.join()
-            mark_process_dead(process.pid, self.config.prometheus_registry_dir.name)
+        self.stop_event.set()

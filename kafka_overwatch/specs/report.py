@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 
 @dataclass
@@ -41,7 +41,7 @@ class Statistics:
     """
     Sum of partitions for the topics
     """
-    most_active_topics: list[str] | None = None
+    most_active_topics: list[str] | dict[str, Any] | None = None
     """
     Topics in the 0.75 percentile of number of messages and new_messages which active consumer groups
     """

@@ -19,26 +19,16 @@ from kafka_overwatch.specs.report import (
     Statistics,
 )
 
-from .topics import generate_cluster_topics_pd_dataframe, process_cluster_topic_df
+from .topics import process_cluster_topic_df
 
 
 def get_cluster_usage(
-    cluster_name: str, kafka_cluster: KafkaCluster
-) -> tuple[ClusterReport, DataFrame]:
+    cluster_name: str, kafka_cluster: KafkaCluster, topics_df: DataFrame
+) -> ClusterReport:
     """
     Based on the topics to monitor, as per the configuration, evaluates the usage of the topics identified.
 
     """
-    topics_df = generate_cluster_topics_pd_dataframe(kafka_cluster)
-    topics_df["partitions"] = topics_df["partitions"].astype(int)
-    topics_df["eval_elapsed_time"] = topics_df["eval_elapsed_time"].astype(int)
-    topics_df["messages_per_seconds"] = (
-        topics_df["new_messages"] / topics_df["eval_elapsed_time"]
-    )
-    topics_df["messages_per_seconds"] = (
-        topics_df["messages_per_seconds"].fillna(0).astype(int)
-    )
-
     topic_categories: dict = process_cluster_topic_df(topics_df)
     estimate = from_dict(
         EstimatedWaste,
@@ -55,7 +45,9 @@ def get_cluster_usage(
     cluster_stats = Statistics(
         topics=int(topics_df["name"].count()),
         partitions=int(sum(topics_df["partitions"].values)),
-        most_active_topics=most_active_topics_df["name"].values.tolist(),
+        most_active_topics=most_active_topics_df.set_index("name")[
+            ["partitions", "total_messages", "new_messages", "active_groups"]
+        ].to_dict(orient="index"),
     )
 
     cluster = ClusterReport(
@@ -65,5 +57,4 @@ def get_cluster_usage(
         estimated_waste=estimate,
     )
     print(f"{kafka_cluster.name} - statistics")
-    print(topics_df.describe())
-    return cluster, topics_df
+    return cluster

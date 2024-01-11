@@ -45,6 +45,10 @@ class OverwatchConfig:
             self.prometheus_registry, path=self._prometheus_registry_dir.name
         )
 
+    def __reduce__(self):
+        # Return a tuple with the callable and its arguments
+        return (self.__class__, (self._config, self._prometheus_registry_dir))
+
     @property
     def input_config(self):
         return self._config

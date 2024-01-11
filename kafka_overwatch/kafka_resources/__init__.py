@@ -6,14 +6,16 @@ from __future__ import annotations
 from copy import deepcopy
 from os import environ
 
-from confluent_kafka import Consumer
+from confluent_kafka import Consumer, KafkaError
 from confluent_kafka.admin import AdminClient
+from retry import retry
 
 
+@retry((KafkaError,), delay=5, max_delay=30, backoff=2)
 def wait_for_result(result_container: dict) -> dict:
     for _future in result_container.values():
         while not _future.done():
-            pass
+            _future.result()
     return result_container
 
 

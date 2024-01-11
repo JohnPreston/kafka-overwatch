@@ -51,10 +51,17 @@
             },
             "most_active_topics": {
               "description": "Topics in the 0.75 percentile of number of messages and new_messages which active consumer groups",
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
+              "oneOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "object"
+                }
+              ]
             },
             "consumer_groups": {
               "type": "object",

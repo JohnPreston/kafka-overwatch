@@ -143,14 +143,8 @@ class KafkaCluster:
         }
 
     @retry(tries=5)
-    def set_cluster_connections(self, force_close: bool = False) -> None:
+    def set_cluster_connections(self) -> None:
         client_config = eval_kafka_client_config(self)
-        if force_close:
-            if self._admin_client:
-                self._admin_client = None
-            if self._consumer_client:
-                self._consumer_client.close()
-                self._consumer_client = None
         self._admin_client: AdminClient = get_admin_client(client_config)
         self._consumer_client: Consumer = get_consumer_client(client_config)
 

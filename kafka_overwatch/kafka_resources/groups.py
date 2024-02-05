@@ -47,7 +47,7 @@ def get_consumer_groups_desc(
             to_retry.append(_group_name)
     if to_retry:
         print(f"GOT TO RETRY {len(to_retry)} CGs")
-        kafka_cluster.set_cluster_connections(force_close=True)
+        kafka_cluster.set_cluster_connections()
         get_consumer_groups_desc(kafka_cluster, to_retry, groups_desc)
 
     return groups_desc

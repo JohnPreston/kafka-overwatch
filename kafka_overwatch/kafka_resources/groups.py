@@ -10,37 +10,47 @@ if TYPE_CHECKING:
     from confluent_kafka.admin import ConsumerGroupDescription
 
 import concurrent.futures
-import signal
-import threading
 
 from confluent_kafka import ConsumerGroupTopicPartitions
-from confluent_kafka.error import KafkaError
+from confluent_kafka.error import KafkaError, KafkaException
 from retry import retry
 
 from kafka_overwatch.config.logging import KAFKA_LOG
-from kafka_overwatch.config.threads_settings import NUM_THREADS
 from kafka_overwatch.kafka_resources import wait_for_result
 from kafka_overwatch.overwatch_resources.groups import ConsumerGroup
 
 
-@retry((KafkaError,), max_delay=30, delay=5, backoff=2, jitter=(2, 5))
 def get_consumer_groups_desc(
-    kafka_cluster: KafkaCluster, groups_list: list
+    kafka_cluster: KafkaCluster,
+    groups_list: list,
+    groups_desc: dict[str, ConsumerGroupDescription] | None = None,
 ) -> dict[str, ConsumerGroupDescription]:
-    try:
-        groups_desc = {
-            _group: desc.result()
-            for _group, desc in wait_for_result(
-                kafka_cluster.admin_client.describe_consumer_groups(
-                    [_group for _group in groups_list]
-                )
-            ).items()
-        }
-        return groups_desc
-    except KafkaError as error:
-        print(f"{kafka_cluster.name} - Error getting consumer group description")
-        KAFKA_LOG.exception(error)
-        raise
+    if groups_desc is None:
+        groups_desc: dict[str, ConsumerGroupDescription] = {}
+
+    admin_client = kafka_cluster.admin_client
+    groups_to_describe: list[str] = [_group for _group in groups_list]
+    groups_desc_r: dict[
+        str, concurrent.futures.Future
+    ] = admin_client.describe_consumer_groups(groups_to_describe)
+
+    to_retry: list[str] = []
+
+    for _group_name, _future in groups_desc_r.items():
+        try:
+            groups_desc[_group_name] = _future.result()
+        except (KafkaError, KafkaException) as error:
+            print(
+                f"{kafka_cluster.name} - {_group_name} - Error getting consumer group description"
+            )
+            print(error)
+            to_retry.append(_group_name)
+    if to_retry:
+        print(f"GOT TO RETRY {len(to_retry)} CGs")
+        kafka_cluster.set_cluster_connections(force_close=True)
+        get_consumer_groups_desc(kafka_cluster, to_retry, groups_desc)
+
+    return groups_desc
 
 
 def tidy_consumer_groups(

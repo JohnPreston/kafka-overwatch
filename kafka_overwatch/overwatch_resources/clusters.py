@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 import json
 from dataclasses import asdict
 from os import makedirs, path
@@ -23,7 +24,7 @@ import threading
 from datetime import datetime as dt
 from datetime import timedelta as td
 
-from confluent_kafka.admin import KafkaError
+from confluent_kafka.admin import KafkaError, KafkaException
 from pandas import DataFrame
 from prometheus_client import Gauge, Summary
 from retry import retry
@@ -105,10 +106,24 @@ class KafkaCluster:
 
     @property
     def admin_client(self) -> AdminClient:
+        try:
+            _desc_future = self._admin_client.describe_cluster()
+            concurrent.futures.as_completed([_desc_future])
+            _desc_future.result()
+        except (KafkaError, KafkaException):
+            print(f"{self.name} - Kafka admin client failed. Creating a new one")
+            admin_config = eval_kafka_client_config(self)
+            self._admin_client = get_admin_client(admin_config)
         return self._admin_client
 
     @property
     def consumer_client(self) -> Consumer:
+        try:
+            self._consumer_client.memberid()
+        except RuntimeError:
+            KAFKA_LOG.warning("Consumer client was closed. Creating new one.")
+            client_config = eval_kafka_client_config(self)
+            self._consumer_client: Consumer = get_consumer_client(client_config)
         return self._consumer_client
 
     @property
@@ -128,8 +143,14 @@ class KafkaCluster:
         }
 
     @retry(tries=5)
-    def set_cluster_connections(self) -> None:
+    def set_cluster_connections(self, force_close: bool = False) -> None:
         client_config = eval_kafka_client_config(self)
+        if force_close:
+            if self._admin_client:
+                self._admin_client = None
+            if self._consumer_client:
+                self._consumer_client.close()
+                self._consumer_client = None
         self._admin_client: AdminClient = get_admin_client(client_config)
         self._consumer_client: Consumer = get_consumer_client(client_config)
 

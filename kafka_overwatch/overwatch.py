@@ -10,13 +10,9 @@ if TYPE_CHECKING:
 
 import concurrent.futures
 import signal
-import threading
-from functools import partial
 from multiprocessing import Event
-from time import sleep
 
 from kafka_overwatch.config.logging import KAFKA_LOG
-from kafka_overwatch.config.threads_settings import NUM_THREADS
 from kafka_overwatch.processing.clusters import process_cluster
 
 
@@ -52,7 +48,6 @@ class KafkaOverwatchService:
 
     def start(self):
         KAFKA_LOG.info("Starting Kafka Overwatch")
-        # KAFKA_LOG.info(f"CONCURRENT_PROCESSES for processing set to {NUM_PROCESSES}")
         self.init_system()
         clusters_jobs = []
         for (
@@ -61,6 +56,18 @@ class KafkaOverwatchService:
         ) in self.config.input_config.clusters.items():
             clusters_jobs.append([cluster_name, cluster_config, self.config])
 
+        if len(clusters_jobs) > 1:
+            self.multi_clusters_processing(clusters_jobs)
+        else:
+            cluster_name = list(self.config.input_config.clusters.keys())[0]
+            cluster_config = self.config.input_config.clusters[cluster_name]
+            try:
+                process_cluster(cluster_name, cluster_config, self.config)
+            except Exception as error:
+                KAFKA_LOG.error(f"Error processing cluster {cluster_name} - {error}")
+                raise
+
+    def multi_clusters_processing(self, clusters_jobs):
         with concurrent.futures.ProcessPoolExecutor(
             max_workers=len(self.config.input_config.clusters)
         ) as executor:
@@ -81,7 +88,8 @@ class KafkaOverwatchService:
         """
         Upon SIGNAL, stop the processes of each cluster.
         """
-        from prometheus_client.multiprocess import mark_process_dead
 
-        KAFKA_LOG.warning(f"Exiting gracefully due to signal/interruption - {pid}")
+        KAFKA_LOG.warning(
+            f"main - Exiting gracefully due to signal/interruption - {pid}"
+        )
         self.stop_event.set()

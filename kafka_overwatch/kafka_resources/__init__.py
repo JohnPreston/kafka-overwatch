@@ -19,7 +19,7 @@ def wait_for_result(result_container: dict) -> dict:
     return result_container
 
 
-def get_consumer_client(settings: dict) -> Consumer:
+def set_consumer_client(settings: dict) -> Consumer:
     """Creates a new librdkafka Consumer client"""
     client_id: str = f"consumer_partitions_hunter"
     cluster_config = deepcopy(settings)
@@ -31,7 +31,7 @@ def get_consumer_client(settings: dict) -> Consumer:
     return Consumer(cluster_config)
 
 
-def get_admin_client(settings: dict) -> AdminClient:
+def set_admin_client(settings: dict) -> AdminClient:
     """Creates a new librdkafka Admin client"""
     client_id: str = f"admin_partitions_hunter"
     timeout_ms_env = int(environ.get("ADMIN_REQUEST_TIMEOUT_MS", 60000))

@@ -78,7 +78,7 @@ def get_topic_descriptions(
 def get_topics_list(kafka_cluster: KafkaCluster) -> list[str]:
     try:
         topic_names: list[str] = list(
-            kafka_cluster.admin_client.list_topics().topics.keys()
+            kafka_cluster.get_admin_client().list_topics().topics.keys()
         )
         return topic_names
     except Exception as error:
@@ -94,7 +94,7 @@ def describe_update_all_topics(
     """
     topic_names = get_topics_list(kafka_cluster)
     desc_topics = retry_call(
-        get_topic_descriptions, fargs=[topic_names, kafka_cluster.admin_client]
+        get_topic_descriptions, fargs=[topic_names, kafka_cluster.get_admin_client()]
     )
     for _cluster_topic_name in list(kafka_cluster.topics.keys()):
         if _cluster_topic_name not in topic_names:
@@ -127,7 +127,7 @@ def update_set_topic_config(kafka_cluster, topics_configs_resources) -> None:
         return
     try:
         topics_config = wait_for_result(
-            kafka_cluster.admin_client.describe_configs(topics_configs_resources)
+            kafka_cluster.get_admin_client().describe_configs(topics_configs_resources)
         )
         for __name, __topic in topics_config.items():
             if __name.name in kafka_cluster.topics:

@@ -24,7 +24,7 @@ import threading
 from datetime import datetime as dt
 from datetime import timedelta as td
 
-from confluent_kafka.admin import KafkaError, KafkaException
+from confluent_kafka.admin import KafkaException
 from pandas import DataFrame
 from prometheus_client import Gauge, Summary
 from retry import retry
@@ -32,7 +32,7 @@ from retry import retry
 from kafka_overwatch.aws_helpers.kafka_client_secrets import eval_kafka_client_config
 from kafka_overwatch.aws_helpers.s3 import S3Handler
 from kafka_overwatch.config.logging import KAFKA_LOG
-from kafka_overwatch.kafka_resources import get_admin_client, get_consumer_client
+from kafka_overwatch.kafka_resources import set_admin_client, set_consumer_client
 from kafka_overwatch.kafka_resources.topics import get_filtered_topics_list
 from kafka_overwatch.specs.config import (
     ClusterConfiguration,
@@ -104,16 +104,38 @@ class KafkaCluster:
     def config(self) -> ClusterConfiguration:
         return self._cluster_config
 
-    @property
-    def admin_client(self) -> AdminClient:
+    def check_replace_kafka_clients(self):
+        replace_admin: bool = False
+        replace_consumer: bool = False
         try:
-            _desc_future = self._admin_client.describe_cluster()
-            concurrent.futures.as_completed([_desc_future])
-            _desc_future.result()
-        except (KafkaError, KafkaException):
-            print(f"{self.name} - Kafka admin client failed. Creating a new one")
-            admin_config = eval_kafka_client_config(self)
-            self._admin_client = get_admin_client(admin_config)
+            _cluster_f = self._admin_client.describe_cluster()
+            concurrent.futures.as_completed([_cluster_f])
+            _cluster_f.result()
+            return self._admin_client
+        except (KafkaException, AttributeError) as error:
+            print("Failed with AdminClient", error)
+            replace_admin = True
+        try:
+            self._consumer_client.memberid()
+        except (
+            AttributeError,
+            RuntimeError,
+        ) as error:
+            print("consumer client failed check")
+            print(error)
+            replace_consumer = True
+
+        if replace_consumer and replace_admin:
+            self.set_cluster_connections()
+        else:
+            if replace_consumer:
+                client_config = eval_kafka_client_config(self)
+                self._consumer_client: Consumer = set_consumer_client(client_config)
+            if replace_admin:
+                client_config = eval_kafka_client_config(self)
+                self._admin_client: AdminClient = set_admin_client(client_config)
+
+    def get_admin_client(self) -> AdminClient:
         return self._admin_client
 
     @property
@@ -123,7 +145,7 @@ class KafkaCluster:
         except RuntimeError:
             KAFKA_LOG.warning("Consumer client was closed. Creating new one.")
             client_config = eval_kafka_client_config(self)
-            self._consumer_client: Consumer = get_consumer_client(client_config)
+            self._consumer_client: Consumer = set_consumer_client(client_config)
         return self._consumer_client
 
     @property
@@ -142,24 +164,28 @@ class KafkaCluster:
             if topic_name in matching_topic_names
         }
 
-    @retry(tries=5)
+    @retry((KafkaException,), tries=5, logger=KAFKA_LOG)
     def set_cluster_connections(self) -> None:
         client_config = eval_kafka_client_config(self)
-        self._admin_client: AdminClient = get_admin_client(client_config)
-        self._consumer_client: Consumer = get_consumer_client(client_config)
+        self._admin_client: AdminClient = set_admin_client(client_config)
+        self._consumer_client: Consumer = set_consumer_client(client_config)
 
-    @retry(tries=2)
+    @retry((KafkaException,), tries=2, logger=KAFKA_LOG)
     def set_cluster_properties(self) -> None:
         try:
-            cluster = self.admin_client.describe_cluster(
+            cluster = self.get_admin_client().describe_cluster(
                 include_authorized_operations=True
             )
-        except KafkaError:
-            cluster = self.admin_client.describe_cluster(
-                include_authorized_operations=False
-            )
-        while not cluster.done():
-            pass
+            concurrent.futures.as_completed([cluster])
+            cluster.result()
+        except KafkaException:
+            try:
+                cluster = self.get_admin_client().describe_cluster(
+                    include_authorized_operations=False
+                )
+                concurrent.futures.as_completed([cluster])
+            except KafkaException:
+                raise
         self.cluster_brokers_count = len(cluster.result().nodes)
 
     def set_reporting_exporters(self):

@@ -28,11 +28,10 @@ def get_consumer_groups_desc(
     if groups_desc is None:
         groups_desc: dict[str, ConsumerGroupDescription] = {}
 
-    admin_client = kafka_cluster.admin_client
     groups_to_describe: list[str] = [_group for _group in groups_list]
     groups_desc_r: dict[
         str, concurrent.futures.Future
-    ] = admin_client.describe_consumer_groups(groups_to_describe)
+    ] = kafka_cluster.get_admin_client().describe_consumer_groups(groups_to_describe)
 
     to_retry: list[str] = []
 
@@ -40,14 +39,14 @@ def get_consumer_groups_desc(
         try:
             groups_desc[_group_name] = _future.result()
         except (KafkaError, KafkaException) as error:
-            print(
-                f"{kafka_cluster.name} - {_group_name} - Error getting consumer group description"
+            KAFKA_LOG.error(
+                "%s - %s - Error getting consumer group description"
+                % (kafka_cluster.name, _group_name)
             )
             print(error)
             to_retry.append(_group_name)
     if to_retry:
         print(f"GOT TO RETRY {len(to_retry)} CGs")
-        kafka_cluster.set_cluster_connections()
         get_consumer_groups_desc(kafka_cluster, to_retry, groups_desc)
 
     return groups_desc
@@ -79,7 +78,7 @@ def set_update_filter_cluster_consumer_groups(kafka_cluster: KafkaCluster) -> No
     Retrieves the consumer group description/details from the cluster
     """
 
-    groups_list_future = kafka_cluster.admin_client.list_consumer_groups()
+    groups_list_future = kafka_cluster.get_admin_client().list_consumer_groups()
     while not groups_list_future.done():
         if groups_list_future.exception():
             print(f"{kafka_cluster.name} - Failed to get consumer groups list")
@@ -167,17 +166,16 @@ def describe_update_consumer_group_offsets(
         return
     try:
         consumer_group.partitions_offsets = wait_for_result(
-            kafka_cluster.admin_client.list_consumer_group_offsets(
+            kafka_cluster.get_admin_client().list_consumer_group_offsets(
                 [ConsumerGroupTopicPartitions(consumer_group.group_id)],
                 require_stable=True,
             )
         )
     except Exception as error:
-        KAFKA_LOG.exception(error)
-        KAFKA_LOG.error(
-            f"{kafka_cluster.name}:{consumer_group.group_id} - "
-            "Failure during retrieving consumer group details"
-        )
+        if error.args[0] == KafkaError.REQUEST_TIMED_OUT:
+            print("CG DESCRIBE TIMEOUT", error)
+        else:
+            print("CG DESCRIBE ERROR", error)
 
 
 def retry_kafka_describe_update_consumer_group_offsets(

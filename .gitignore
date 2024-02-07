@@ -77,7 +77,7 @@ instance/
 .scrapy
 
 # Sphinx documentation
-docs/ecs_composex*.rst
+docs/kafka_overwatch*.rst
 docs/modules.rst
 docs/_build/*
 docs/_static/*

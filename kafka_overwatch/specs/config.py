@@ -158,16 +158,28 @@ class ConfluentCloudAuth:
     """
 
 
+@dataclass
+class SaaSProviderAwsSecretsManager:
+    secret_id: str | None = None
+    """
+    Name or ARN of secret to use to store the key. If ARN is detected, existing secret content will be updated. If name is provided but not found, creates new secret.
+    """
+    iam_override: IamOverride | None = None
+
+
 ProfileName = str
 
 
 @dataclass
 class Global:
     """
-    Global settings. Apply to all clusters
+    Global settings. Defines global default values that can be overriden for each cluster.
     """
 
     cluster_scan_interval_in_seconds: ClusterScanIntervalInSeconds
+    """
+    Default topics & consumer groups scan interval
+    """
 
 
 @dataclass
@@ -181,15 +193,6 @@ class AwsEmfModel:
     override value for EMF Service name. Importance: Low
     """
     watcher_config: AwsEmf | None = None
-
-
-@dataclass
-class SaaSProviderAwsSecretsManager:
-    secret_id: str | None = None
-    """
-    Name or ARN of secret to use to store the key. If ARN is detected, existing secret content will be updated. If name is provided but not found, creates new secret.
-    """
-    iam_override: IamOverride | None = None
 
 
 @dataclass
@@ -359,12 +362,18 @@ class ConfluentProvider:
 @dataclass
 class Providers:
     """
-    Allows to define a Kafka SaaS provider and perform discovery of existing clusters to scan
+    Allows to define a Kafka SaaS provider and perform discovery of existing clusters to scan. (Not yet implemented)
     """
 
     aiven: Any | None = None
     aws_msk: MskProvider | None = None
+    """
+    AWS MSK Clusters discovery
+    """
     confluent_cloud: ConfluentProvider | None = None
+    """
+    Confluent Cloud environments & clusters discovery.
+    """
     conduktor_gateway: dict[str, GatewayConfiguration] | None = None
     """
     Gateways to monitor and import the vClusters from the partitions usage
@@ -396,7 +405,7 @@ class KafkaOverwatchInputConfiguration:
 
     global_: Global | None = None
     """
-    Global settings. Apply to all clusters
+    Global settings. Defines global default values that can be overriden for each cluster.
     """
     clusters: dict[str, ClusterConfiguration] | None = None
     """
@@ -404,8 +413,11 @@ class KafkaOverwatchInputConfiguration:
     """
     providers: Providers | None = None
     """
-    Allows to define a Kafka SaaS provider and perform discovery of existing clusters to scan
+    Allows to define a Kafka SaaS provider and perform discovery of existing clusters to scan. (Not yet implemented)
     """
     prometheus: Any | None = None
     notification_channels: NotificationChannels | None = None
+    """
+    Allows to define notification channels for reporting (not yet implemented).
+    """
     aws_emf: AwsEmfModel | None = None

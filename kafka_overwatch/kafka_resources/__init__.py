@@ -6,12 +6,12 @@ from __future__ import annotations
 from copy import deepcopy
 from os import environ
 
-from confluent_kafka import Consumer, KafkaError
+from confluent_kafka import Consumer, KafkaError, KafkaException
 from confluent_kafka.admin import AdminClient
 from retry import retry
 
 
-@retry((KafkaError,), delay=5, max_delay=30, backoff=2)
+@retry((KafkaException,), delay=5, max_delay=30, backoff=2)
 def wait_for_result(result_container: dict) -> dict:
     for _future in result_container.values():
         while not _future.done():
@@ -19,7 +19,7 @@ def wait_for_result(result_container: dict) -> dict:
     return result_container
 
 
-def get_consumer_client(settings: dict) -> Consumer:
+def set_consumer_client(settings: dict) -> Consumer:
     """Creates a new librdkafka Consumer client"""
     client_id: str = f"consumer_partitions_hunter"
     cluster_config = deepcopy(settings)
@@ -31,7 +31,7 @@ def get_consumer_client(settings: dict) -> Consumer:
     return Consumer(cluster_config)
 
 
-def get_admin_client(settings: dict) -> AdminClient:
+def set_admin_client(settings: dict) -> AdminClient:
     """Creates a new librdkafka Admin client"""
     client_id: str = f"admin_partitions_hunter"
     timeout_ms_env = int(environ.get("ADMIN_REQUEST_TIMEOUT_MS", 60000))

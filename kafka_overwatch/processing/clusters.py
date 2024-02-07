@@ -93,15 +93,21 @@ def process_cluster(
     kafka_cluster = KafkaCluster(
         cluster_name, cluster_config, overwatch_config=overwatch_config
     )
-    kafka_cluster.set_cluster_connections()
-    kafka_cluster.set_cluster_properties()
     kafka_cluster.set_reporting_exporters()
-
+    kafka_cluster.set_cluster_connections()
     consumer_group_lag_gauge = overwatch_config.prometheus_collectors[
         "consumer_group_lag"
     ]
 
     while FOREVER:
+        kafka_cluster.check_replace_kafka_clients()
+        kafka_cluster.set_cluster_properties()
+        print(
+            "PROCESSING LOOP - CLIENTS??",
+            hex(id(kafka_cluster._admin_client)),
+            hex(id(kafka_cluster._consumer_client)),
+        )
+
         processing_start = dt.utcnow()
         if not stop_flag.is_set():
             process_cluster_resources(kafka_cluster)
@@ -127,6 +133,8 @@ def process_cluster(
         time_to_wait = int(
             kafka_cluster.config.cluster_scan_interval_in_seconds - elapsed_time
         )
+        # kafka_cluster._admin_client = None
+        # kafka_cluster.consumer_client.close()
         if time_to_wait <= 0:
             print(
                 f"{kafka_cluster.name} - interval set to {kafka_cluster.config.cluster_scan_interval_in_seconds}"

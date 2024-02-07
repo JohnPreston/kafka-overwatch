@@ -1,6 +1,7 @@
 ARG ARCH=
 ARG PY_VERSION=3.10-slim
 ARG BASE_IMAGE=public.ecr.aws/docker/library/python:$PY_VERSION
+ARG PYPY_IMAGE=pypy:3.10
 ARG LAMBDA_IMAGE=public.ecr.aws/lambda/python:latest
 
 FROM $BASE_IMAGE as builder
@@ -11,6 +12,7 @@ RUN pip install poetry
 COPY kafka_overwatch /opt/kafka_overwatch
 COPY pyproject.toml poetry.lock README.rst LICENSE /opt/
 RUN poetry build
+
 
 FROM $BASE_IMAGE
 COPY --from=builder /opt/dist/kafka_overwatch-*.whl /opt/kafka-overwatch/

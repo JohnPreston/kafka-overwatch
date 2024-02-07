@@ -18,7 +18,7 @@ from datetime import datetime as dt
 
 from confluent_kafka import TopicCollection, TopicPartition
 from confluent_kafka.admin import AclOperation, ConfigResource, ResourceType
-from confluent_kafka.error import KafkaError
+from confluent_kafka.error import KafkaError, KafkaException
 from retry.api import retry, retry_call
 
 from kafka_overwatch.config.logging import KAFKA_LOG
@@ -58,7 +58,7 @@ def get_filtered_topics_list(cluster: KafkaCluster) -> list[str]:
     return final_list
 
 
-@retry((KafkaError,), tries=5)
+@retry((KafkaException,), tries=5)
 def get_topic_descriptions(
     topic_names: list[str], admin_client
 ) -> dict[str, TopicDescription]:
@@ -74,11 +74,11 @@ def get_topic_descriptions(
     return desc_topics
 
 
-@retry((KafkaError,), tries=5)
+@retry((KafkaException,), tries=5)
 def get_topics_list(kafka_cluster: KafkaCluster) -> list[str]:
     try:
         topic_names: list[str] = list(
-            kafka_cluster.admin_client.list_topics().topics.keys()
+            kafka_cluster.get_admin_client().list_topics().topics.keys()
         )
         return topic_names
     except Exception as error:
@@ -94,7 +94,7 @@ def describe_update_all_topics(
     """
     topic_names = get_topics_list(kafka_cluster)
     desc_topics = retry_call(
-        get_topic_descriptions, fargs=[topic_names, kafka_cluster.admin_client]
+        get_topic_descriptions, fargs=[topic_names, kafka_cluster.get_admin_client()]
     )
     for _cluster_topic_name in list(kafka_cluster.topics.keys()):
         if _cluster_topic_name not in topic_names:
@@ -127,13 +127,13 @@ def update_set_topic_config(kafka_cluster, topics_configs_resources) -> None:
         return
     try:
         topics_config = wait_for_result(
-            kafka_cluster.admin_client.describe_configs(topics_configs_resources)
+            kafka_cluster.get_admin_client().describe_configs(topics_configs_resources)
         )
         for __name, __topic in topics_config.items():
             if __name.name in kafka_cluster.topics:
                 kafka_cluster.topics[__name.name].config = __topic.result()
 
-    except KafkaError as error:
+    except KafkaException as error:
         print(f"{kafka_cluster.name} - DescribeConfigs on topics failed: {error}")
 
 
@@ -207,50 +207,45 @@ def describe_update_topics(kafka_cluster: KafkaCluster, desc_topics: dict) -> No
     update_set_topic_config(kafka_cluster, topics_configs_resources)
 
 
-@retry((KafkaError,), tries=10, delay=5, backoff=2, jitter=(2, 5), logger=KAFKA_LOG)
+@retry((KafkaException,), tries=10, delay=5, backoff=2, jitter=(2, 5), logger=KAFKA_LOG)
 def get_topic_partition_watermarks(consumer_client, topic_name, partition_id):
     try:
         start_offset, end_offset = consumer_client.get_watermark_offsets(
             TopicPartition(topic_name, partition_id)
         )
         return start_offset, end_offset
-    except KafkaError as error:
+    except KafkaException as error:
         KAFKA_LOG.exception(error)
-        KAFKA_LOG.error(f"Failed to get topic {topic_name} watermarks")
+        KAFKA_LOG.error(f"Failed to get topic {topic_name}-{partition_id} watermarks")
         return None, None
 
 
-# def init_set_partitions(queue):
-def init_set_partitions(topic_obj: Topic, consumer_client, topic, now):
-    # while 42:
-    #     if not queue.empty():
-    #         topic_obj, consumer_client, topic, now = queue.get()
+def init_set_partitions(topic_obj: Topic, consumer_client, topic, now: dt):
     partitions = topic.partitions
     for _partition in partitions:
         try:
             start_offset, end_offset = get_topic_partition_watermarks(
                 consumer_client, topic.name, _partition.id
             )
-            if start_offset is None or end_offset is None:
-                KAFKA_LOG.debug("No start offset or end offset data retrieved")
-                continue
-            if _partition.id not in topic_obj.partitions:
-                partition = Partition(
-                    topic_obj, _partition.id, start_offset, end_offset, now
-                )
-                topic_obj.partitions[_partition.id] = partition
-            else:
-                partition = topic_obj.partitions[_partition.id]
-                partition.end_offset = end_offset, now
-                if start_offset != partition.init_start_offset[0]:
-                    partition.first_offset = start_offset, now
         except Exception as error:
             KAFKA_LOG.exception(error)
             KAFKA_LOG.error(
                 f"Unable to update topic {topic.name} partition {_partition.id} watermarks"
             )
-    #     queue.task_done()
-    # else:
-    #     KAFKA_LOG.debug("Topic watermark worker - stopping")
-    #     return
+            start_offset = None
+            end_offset = None
+
+        if start_offset is None or end_offset is None:
+            KAFKA_LOG.debug("No start offset or end offset data retrieved")
+            continue
+        if _partition.id not in topic_obj.partitions:
+            partition = Partition(
+                topic_obj, _partition.id, start_offset, end_offset, now
+            )
+            topic_obj.partitions[_partition.id] = partition
+        else:
+            partition = topic_obj.partitions[_partition.id]
+            partition.end_offset = end_offset, now
+        if start_offset != partition.init_start_offset[0]:
+            partition.first_offset = start_offset, now
     return f"{topic_obj.name} - {(dt.utcnow() - now).total_seconds()}"

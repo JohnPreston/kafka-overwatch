@@ -167,6 +167,31 @@ class SaaSProviderAwsSecretsManager:
     iam_override: IamOverride | None = None
 
 
+@dataclass
+class TopicNamingConvention:
+    """
+    Evaluates topic name against one or more regex and reports non-compliant topics
+    """
+
+    regexes: list[str]
+    ignore_regexes: list[str] | None = None
+    """
+    List/Array of regular expression of topic names to ignore for review. Use to ignore internal or stream topics
+    """
+
+
+@dataclass
+class GovernanceReportingConfig:
+    """
+    Configuration for governance cluster analysis
+    """
+
+    topic_naming_convention: TopicNamingConvention | None = None
+    """
+    Evaluates topic name against one or more regex and reports non-compliant topics
+    """
+
+
 ProfileName = str
 
 
@@ -388,6 +413,7 @@ class ClusterConfiguration:
     """
     Overrides the global setting
     """
+    governance_reporting: GovernanceReportingConfig | None = None
     topics_backup_config: ClusterTopicBackupConfig | None = None
     topic_include_regexes: Regexes | None = None
     topic_exclude_regexes: Regexes | None = None

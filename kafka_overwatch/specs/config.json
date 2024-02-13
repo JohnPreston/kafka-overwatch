@@ -305,6 +305,9 @@
             }
           ]
         },
+        "governance": {
+          "$ref": "#/definitions/governanceReportingConfig"
+        },
         "reporting_config": {
           "$ref": "#/definitions/ReportingConfig"
         },
@@ -539,6 +542,36 @@
         },
         "iam_override": {
           "$ref": "#/definitions/IamOverride"
+        }
+      }
+    },
+    "governanceReportingConfig": {
+      "type": "object",
+      "description": "Configuration for governance cluster analysis",
+      "properties": {
+        "topic_naming_convention": {
+          "type": "object",
+          "description": "Evaluates topic name against one or more regex and reports non-compliant topics",
+          "required": [
+            "regexes"
+          ],
+          "properties": {
+            "regexes": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "description": "Regular expression for compliant topic name"
+              }
+            },
+            "ignore_regexes": {
+              "type": "array",
+              "description": "List/Array of regular expression of topic names to ignore for review. Use to ignore internal or stream topics",
+              "items": {
+                "type": "string",
+                "description": "Regular expression for topic to ignore"
+              }
+            }
+          }
         }
       }
     }

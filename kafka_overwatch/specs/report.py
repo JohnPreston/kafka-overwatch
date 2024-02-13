@@ -16,6 +16,39 @@ class Metadata:
 
 
 @dataclass
+class TopicNamingConvention:
+    total_topics: float | None = None
+    """
+    Total number of topics in the cluster
+    """
+    total_topic_ignored: float | None = None
+    """
+    Total number of topics ignored via regex
+    """
+    total_topic_measured: float | None = None
+    """
+    Total number of topics measured
+    """
+    compliant_topic_percentage: float | None = None
+    """
+    Percentage of compliant topics, out of total_topic_measured
+    """
+    non_compliant_topics: list[str] | None = None
+    """
+    List of non-compliant topic names
+    """
+
+
+@dataclass
+class Governance:
+    """
+    Governance report structure
+    """
+
+    topic_naming_convention: TopicNamingConvention | None = None
+
+
+@dataclass
 class ConsumerGroups:
     total: int
     """
@@ -77,6 +110,10 @@ class EstimatedWaste:
 class ClusterReport:
     cluster_name: str
     metadata: Metadata
+    governance: Governance | None = None
+    """
+    Governance report structure
+    """
     statistics: Statistics | None = None
     estimated_waste: EstimatedWaste | None = None
 

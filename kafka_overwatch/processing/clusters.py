@@ -133,8 +133,6 @@ def process_cluster(
         time_to_wait = int(
             kafka_cluster.config.cluster_scan_interval_in_seconds - elapsed_time
         )
-        # kafka_cluster._admin_client = None
-        # kafka_cluster.consumer_client.close()
         if time_to_wait <= 0:
             print(
                 f"{kafka_cluster.name} - interval set to {kafka_cluster.config.cluster_scan_interval_in_seconds}"

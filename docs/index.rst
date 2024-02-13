@@ -39,6 +39,7 @@ Extras
 Here are some extra features that serve additional needs
 
 * Generates commands script to re-create all the topics in case of DR (store local or to S3)
+* Governance: evaluate your resources configuration
 
 
 
@@ -126,6 +127,13 @@ With python
     requisites
     installation
     lexicon
+
+.. toctree::
+    :maxdepth: 1
+    :caption: Features
+
+    features
+
 
 .. toctree::
     :maxdepth: 1

@@ -8,27 +8,24 @@ env:
     DOCKER_CLI_EXPERIMENTAL: enabled
 
 batch:
-  fast-fail: false
+  fast-fail: true
   build-graph:
-
     - identifier: x86_64
       env:
         compute-type: BUILD_GENERAL1_SMALL
         privileged-mode: true
         variables:
           ARCH: x86_64
-          DOCKER_REPO_NAME: kafka-overwatch
       buildspec: .codebuild/build_images.yml
 
     - identifier: aarch64
       env:
         type: ARM_CONTAINER
-        image: aws/codebuild/amazonlinux2-aarch64-standard:2.0
+        image: aws/codebuild/amazonlinux2-aarch64-standard:3.0
         compute-type: BUILD_GENERAL1_SMALL
         privileged-mode: true
         variables:
           ARCH: aarch64
-          DOCKER_REPO_NAME: kafka-overwatch
       buildspec: .codebuild/build_images.yml
 
     - identifier: manifest
@@ -68,29 +65,29 @@ phases:
           for ARCH in "x86_64" "aarch64"; do
               ARCH_TAG=${VERSION}-${ARCH}
 
-              echo Publish from ${REGISTRY_URI}ecs-files-composer:${ARCH_TAG}$ to ${PUBLIC_REGISTRY}/ecs-files-composer:${ARCH_TAG}
-              docker pull ${REGISTRY_URI}ecs-files-composer:${ARCH_TAG}
-              docker tag  ${REGISTRY_URI}ecs-files-composer:${ARCH_TAG} ${PUBLIC_REGISTRY}/ecs-files-composer:${ARCH_TAG}
-              docker tag  ${REGISTRY_URI}ecs-files-composer:${ARCH_TAG} ${AWS_MARKET_REGISTRY}/compose-x/files-composer:${ARCH_TAG}
-              docker tag  ${REGISTRY_URI}ecs-files-composer:${ARCH_TAG} ${AWS_MARKET_REGISTRY}/compose-x/ecs-files-composer:${ARCH_TAG}
-              docker push ${PUBLIC_REGISTRY}/ecs-files-composer:${ARCH_TAG}
+              echo Publish from ${REGISTRY_URI}${DOCKER_REPO_NAME}:${ARCH_TAG}$ to ${PUBLIC_REGISTRY}/${DOCKER_REPO_NAME}:${ARCH_TAG}
+              docker pull ${REGISTRY_URI}${DOCKER_REPO_NAME}:${ARCH_TAG}
+              docker tag  ${REGISTRY_URI}${DOCKER_REPO_NAME}:${ARCH_TAG} ${PUBLIC_REGISTRY}/${DOCKER_REPO_NAME}:${ARCH_TAG}
+              docker tag  ${REGISTRY_URI}${DOCKER_REPO_NAME}:${ARCH_TAG} ${AWS_MARKET_REGISTRY}/compose-x/files-composer:${ARCH_TAG}
+              docker tag  ${REGISTRY_URI}${DOCKER_REPO_NAME}:${ARCH_TAG} ${AWS_MARKET_REGISTRY}/compose-x/${DOCKER_REPO_NAME}:${ARCH_TAG}
+              docker push ${PUBLIC_REGISTRY}/${DOCKER_REPO_NAME}:${ARCH_TAG}
           done
       - |
-          docker manifest create ${PUBLIC_REGISTRY}/ecs-files-composer:${VERSION}  \
-              --amend ${PUBLIC_REGISTRY}/ecs-files-composer:${VERSION}-x86_64       \
-              --amend ${PUBLIC_REGISTRY}/ecs-files-composer:${VERSION}-aarch64
-      - docker manifest push ${PUBLIC_REGISTRY}/ecs-files-composer:${VERSION}
+          docker manifest create ${PUBLIC_REGISTRY}/${DOCKER_REPO_NAME}:${VERSION}  \
+              --amend ${PUBLIC_REGISTRY}/${DOCKER_REPO_NAME}:${VERSION}-x86_64       \
+              --amend ${PUBLIC_REGISTRY}/${DOCKER_REPO_NAME}:${VERSION}-aarch64
+      - docker manifest push ${PUBLIC_REGISTRY}/${DOCKER_REPO_NAME}:${VERSION}
       - |
           if [ "${PRE}" == "tag" ]; then
-            docker manifest create ${PUBLIC_REGISTRY}/ecs-files-composer:latest  \
-              --amend ${PUBLIC_REGISTRY}/ecs-files-composer:${VERSION}-x86_64     \
-              --amend ${PUBLIC_REGISTRY}/ecs-files-composer:${VERSION}-aarch64;
-            docker manifest push ${PUBLIC_REGISTRY}/ecs-files-composer:latest;
+            docker manifest create ${PUBLIC_REGISTRY}/${DOCKER_REPO_NAME}:latest  \
+              --amend ${PUBLIC_REGISTRY}/${DOCKER_REPO_NAME}:${VERSION}-x86_64     \
+              --amend ${PUBLIC_REGISTRY}/${DOCKER_REPO_NAME}:${VERSION}-aarch64;
+            docker manifest push ${PUBLIC_REGISTRY}/${DOCKER_REPO_NAME}:latest;
           else
-            docker manifest create ${PUBLIC_REGISTRY}/ecs-files-composer:nightly  \
-              --amend ${PUBLIC_REGISTRY}/ecs-files-composer:${VERSION}-x86_64     \
-              --amend ${PUBLIC_REGISTRY}/ecs-files-composer:${VERSION}-aarch64;
-            docker manifest push ${PUBLIC_REGISTRY}/ecs-files-composer:nightly;
+            docker manifest create ${PUBLIC_REGISTRY}/${DOCKER_REPO_NAME}:nightly  \
+              --amend ${PUBLIC_REGISTRY}/${DOCKER_REPO_NAME}:${VERSION}-x86_64     \
+              --amend ${PUBLIC_REGISTRY}/${DOCKER_REPO_NAME}:${VERSION}-aarch64;
+            docker manifest push ${PUBLIC_REGISTRY}/${DOCKER_REPO_NAME}:nightly;
           fi
 
     finally:

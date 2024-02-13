@@ -13,6 +13,10 @@ Welcome to Kafka Overwatch documentation
 
 |QUALITY|
 
+Docker Build Status |BUILD|
+
+Docs Build status |DOCS_BUILD|
+
 TL;DR
 ======
 
@@ -79,8 +83,9 @@ With python
     python3 -m pip install kafka-overwatch --user
 
 
-.. |BUILD| image::
+.. |BUILD| image:: https://codebuild.eu-west-1.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiY09mam1xZTBQMUtZKzJGV1hCaGQwYTVpbTQ1VGFxTEtEbjh5ZTZqTm0zRmV4Tng2M01Wazk4VG91bjlTRXBJdEcvQzJ1K1ZBRTN3TTA0ZUV6WnA3dFRVPSIsIml2UGFyYW1ldGVyU3BlYyI6IlJXb3ByeE44ZGx3VnI3MkEiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main
 
+.. |DOCS_BUILD| image:: https://codebuild.eu-west-1.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiSVNBZkVSUkx1NHhtamlqSEJqempIdHd2aVNqV2RkTTFVYlphUzJ2ekprOVU4ODZ4cUNWcTNVSkRVM2ovcGFyak5NTTNJZ1Vra2ErSzVOdi84TkVLOUp3PSIsIml2UGFyYW1ldGVyU3BlYyI6IjAvK25MSmNPcjNScVpwdTQiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main
 
 .. |PYPI_VERSION| image:: https://img.shields.io/pypi/v/kafka-overwatch.svg
         :target: https://pypi.python.org/pypi/kafka-overwatch

@@ -29,9 +29,9 @@ phases:
   build:
     commands:
       - TAG=${SUFFIX}
-      - docker build -t ${REPO_NAME}:${TAG}${ARCH:+-$ARCH} ${ARCH:+--build-arg ARCH="-${ARCH}"} -f Dockerfile .
-      - docker tag ${REPO_NAME}:${TAG}${ARCH:+-$ARCH} ${REGISTRY_URI}${REPO_NAME}:${TAG}${ARCH:+-$ARCH}
-      - docker push ${REGISTRY_URI}${REPO_NAME}:${TAG}${ARCH:+-$ARCH}
+      - docker build -t ${DOCKER_REPO_NAME}:${TAG}${ARCH:+-$ARCH} ${ARCH:+--build-arg ARCH="-${ARCH}"} -f Dockerfile .
+      - docker tag ${DOCKER_REPO_NAME}:${TAG}${ARCH:+-$ARCH} ${REGISTRY_URI}${DOCKER_REPO_NAME}:${TAG}${ARCH:+-$ARCH}
+      - docker push ${REGISTRY_URI}${DOCKER_REPO_NAME}:${TAG}${ARCH:+-$ARCH}
 
     finally:
       - rm -rfv ~/.docker

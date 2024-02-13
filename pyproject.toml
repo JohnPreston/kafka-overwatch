@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "kafka-overwatch"
-version = "0.0.2"
+version = "0.1.0"
 description = "Continuously monitors Kafka cluster topics & consumer groups"
 authors = ["John \"Preston\" Mille <john@ews-network.net>"]
 maintainers = ["John \"Preston\" Mille <john@ews-network.net>"]
@@ -89,7 +89,7 @@ omit = [
 github_url = "https://github.com/johnpreston/kafka-overwatch"
 
 [tool.tbump.version]
-current = "0.0.2"
+current = "0.1.0"
 regex = '''
   (?P<major>\d+)
   \.

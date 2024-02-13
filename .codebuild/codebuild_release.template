@@ -195,10 +195,6 @@ Resources:
           - Name: MARKET_REPO_AWS_REGION
             Type: PLAINTEXT
             Value: us-east-1
-          - Name: DOCKER_REPO_NAME
-            Type: PLAINTEXT
-            Value:
-              Ref: DockerRepositoryName
       Source:
         Type: GITHUB
         ReportBuildStatus: true

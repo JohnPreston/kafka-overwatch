@@ -71,3 +71,20 @@ similar to `cruise-control`_.
 .. _cruise-control: https://github.com/linkedin/cruise-control
 .. _jsonschema: https://pypi.org/project/jsonschema/
 .. _NASA: https://www.nasa.gov/
+
+
+Status
+=======
+
+Images build status
+
+|BUILD|
+
+Docs build status
+
+|DOCS_BUILD|
+
+
+.. |BUILD| image:: https://codebuild.eu-west-1.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiU3RHQnZ2eFpnQTlOSmU2MUM3NDB5NW9uMDY2TS9DZXBWZ2hmejdoK2xJRStHK2Fhd3FkS1FoQjJOSTcvYjVBNkFTTW5kVDNZK0NqZEthU3gveFpOVEljPSIsIml2UGFyYW1ldGVyU3BlYyI6IjlUbE0vNmpPQU92U1o0SmkiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main
+
+.. |DOCS_BUILD| image:: https://codebuild.eu-west-1.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiSVNBZkVSUkx1NHhtamlqSEJqempIdHd2aVNqV2RkTTFVYlphUzJ2ekprOVU4ODZ4cUNWcTNVSkRVM2ovcGFyak5NTTNJZ1Vra2ErSzVOdi84TkVLOUp3PSIsIml2UGFyYW1ldGVyU3BlYyI6IjAvK25MSmNPcjNScVpwdTQiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=main

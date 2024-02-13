@@ -305,7 +305,7 @@
             }
           ]
         },
-        "governance_reporting": {
+        "governance": {
           "$ref": "#/definitions/governanceReportingConfig"
         },
         "reporting_config": {

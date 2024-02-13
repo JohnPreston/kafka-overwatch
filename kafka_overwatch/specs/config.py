@@ -413,7 +413,7 @@ class ClusterConfiguration:
     """
     Overrides the global setting
     """
-    governance_reporting: GovernanceReportingConfig | None = None
+    governance: GovernanceReportingConfig | None = None
     topics_backup_config: ClusterTopicBackupConfig | None = None
     topic_include_regexes: Regexes | None = None
     topic_exclude_regexes: Regexes | None = None

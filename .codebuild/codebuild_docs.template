@@ -152,7 +152,7 @@ Resources:
         EnvironmentVariables:
           - Name: PY_VERSION
             Type: PLAINTEXT
-            Value: 3.8
+            Value: 3.11
           - Type: PLAINTEXT
             Name: DOCS_BUCKET
             Value:

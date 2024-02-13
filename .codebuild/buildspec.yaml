@@ -1,0 +1,94 @@
+
+version: 0.2
+env:
+  shell: /bin/bash
+  variables:
+    USE_EPOCH: 0
+    PUBLIC_REGISTRY: public.ecr.aws/compose-x
+    DOCKER_CLI_EXPERIMENTAL: enabled
+
+batch:
+  fast-fail: true
+  build-graph:
+    - identifier: x86_64
+      env:
+        compute-type: BUILD_GENERAL1_SMALL
+        privileged-mode: true
+        variables:
+          ARCH: x86_64
+      buildspec: .codebuild/build_images.yml
+
+    - identifier: aarch64
+      env:
+        type: ARM_CONTAINER
+        image: aws/codebuild/amazonlinux2-aarch64-standard:3.0
+        compute-type: BUILD_GENERAL1_SMALL
+        privileged-mode: true
+        variables:
+          ARCH: aarch64
+      buildspec: .codebuild/build_images.yml
+
+    - identifier: manifest
+      env:
+        compute-type: BUILD_GENERAL1_SMALL
+        privileged-mode: true
+      depend-on:
+        - x86_64
+        - aarch64
+
+phases:
+  install:
+    commands:
+      - if [ -z ${AWS_ACCOUNT_ID+x} ]; then AWS_ACCOUNT_ID=$(aws sts get-caller-identity | jq -r .Account); fi
+      - REGISTRY_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION:-$AWS_DEFAULT_REGION}.amazonaws.com/
+      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin ${REGISTRY_URI}
+      - AWS_MARKET_REGISTRY=${MARKET_REPO_ACCOUNT_ID}.dkr.ecr.${MARKET_REPO_AWS_REGION}.amazonaws.com
+      - aws ecr get-login-password --region ${MARKET_REPO_AWS_REGION} | docker login --username AWS --password-stdin ${AWS_MARKET_REGISTRY}
+      - aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${PUBLIC_REGISTRY}
+      - if ! [ -z ${CODEBUILD_RESOLVED_SOURCE_VERSION+x} ]; then COMMIT_HASH=${CODEBUILD_RESOLVED_SOURCE_VERSION::7}; fi
+      - EPOCH=`date +'%Y%m%d'`
+      - VERSION=${COMMIT_HASH:=$EPOCH}
+      - if [ $USE_EPOCH -eq 1 ]; then VERSION=$EPOCH; fi
+      - |
+          if ! [ -z "${CODEBUILD_WEBHOOK_TRIGGER+x}" ]; then
+            echo TRIGGER is $CODEBUILD_WEBHOOK_TRIGGER
+            PRE=`echo $CODEBUILD_WEBHOOK_TRIGGER|cut -d '/' -f 1`;
+            echo PRE is $PRE
+            echo VERSION is $VERSION
+            if [ "${PRE}" == "tag" ]; then VERSION=`echo $CODEBUILD_WEBHOOK_TRIGGER|cut -d '/' -f 2`; TAG_RELEASE=1 ; fi
+          fi
+      - echo VERSION ends up being $VERSION
+
+  build:
+    commands:
+      - |
+          for ARCH in "x86_64" "aarch64"; do
+              ARCH_TAG=${VERSION}-${ARCH}
+
+              echo Publish from ${REGISTRY_URI}${DOCKER_REPO_NAME}:${ARCH_TAG}$ to ${PUBLIC_REGISTRY}/${DOCKER_REPO_NAME}:${ARCH_TAG}
+              docker pull ${REGISTRY_URI}${DOCKER_REPO_NAME}:${ARCH_TAG}
+              docker tag  ${REGISTRY_URI}${DOCKER_REPO_NAME}:${ARCH_TAG} ${PUBLIC_REGISTRY}/${DOCKER_REPO_NAME}:${ARCH_TAG}
+              docker tag  ${REGISTRY_URI}${DOCKER_REPO_NAME}:${ARCH_TAG} ${AWS_MARKET_REGISTRY}/compose-x/files-composer:${ARCH_TAG}
+              docker tag  ${REGISTRY_URI}${DOCKER_REPO_NAME}:${ARCH_TAG} ${AWS_MARKET_REGISTRY}/compose-x/${DOCKER_REPO_NAME}:${ARCH_TAG}
+              docker push ${PUBLIC_REGISTRY}/${DOCKER_REPO_NAME}:${ARCH_TAG}
+          done
+      - |
+          docker manifest create ${PUBLIC_REGISTRY}/${DOCKER_REPO_NAME}:${VERSION}  \
+              --amend ${PUBLIC_REGISTRY}/${DOCKER_REPO_NAME}:${VERSION}-x86_64       \
+              --amend ${PUBLIC_REGISTRY}/${DOCKER_REPO_NAME}:${VERSION}-aarch64
+      - docker manifest push ${PUBLIC_REGISTRY}/${DOCKER_REPO_NAME}:${VERSION}
+      - |
+          if [ "${PRE}" == "tag" ]; then
+            docker manifest create ${PUBLIC_REGISTRY}/${DOCKER_REPO_NAME}:latest  \
+              --amend ${PUBLIC_REGISTRY}/${DOCKER_REPO_NAME}:${VERSION}-x86_64     \
+              --amend ${PUBLIC_REGISTRY}/${DOCKER_REPO_NAME}:${VERSION}-aarch64;
+            docker manifest push ${PUBLIC_REGISTRY}/${DOCKER_REPO_NAME}:latest;
+          else
+            docker manifest create ${PUBLIC_REGISTRY}/${DOCKER_REPO_NAME}:nightly  \
+              --amend ${PUBLIC_REGISTRY}/${DOCKER_REPO_NAME}:${VERSION}-x86_64     \
+              --amend ${PUBLIC_REGISTRY}/${DOCKER_REPO_NAME}:${VERSION}-aarch64;
+            docker manifest push ${PUBLIC_REGISTRY}/${DOCKER_REPO_NAME}:nightly;
+          fi
+
+    finally:
+      - rm -rfv ~/.docker

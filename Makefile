@@ -97,7 +97,7 @@ nightly-docs: docs
 publish-docs: docs
 	cd docs/_build/html && \
 	$(AWS) s3 sync . s3://${DOCS_BUCKET}/ \
-	--acl public-read --sse AES256 --storage-class ONEZONE_IA
+	--sse AES256 --storage-class ONEZONE_IA
 
 servedocs: docs ## compile the docs watching for changes
 	watchmedo shell-command -p '*.rst' -c '$(MAKE) -C docs html' -R -D .

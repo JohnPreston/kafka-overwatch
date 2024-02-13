@@ -6,7 +6,6 @@ env:
     USE_EPOCH: 0
     PUBLIC_REGISTRY: public.ecr.aws/compose-x
     DOCKER_CLI_EXPERIMENTAL: enabled
-    DOCKER_REPO_NAME: kafka-overwatch
 
 batch:
   fast-fail: false

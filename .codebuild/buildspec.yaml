@@ -18,7 +18,7 @@ batch:
         privileged-mode: true
         variables:
           ARCH: x86_64
-          DOCKER_REPO_NAME: $DOCKER_REPO_NAME
+          DOCKER_REPO_NAME: kafka-overwatch
       buildspec: .codebuild/build_images.yml
 
     - identifier: aarch64
@@ -29,7 +29,7 @@ batch:
         privileged-mode: true
         variables:
           ARCH: aarch64
-          DOCKER_REPO_NAME: $DOCKER_REPO_NAME
+          DOCKER_REPO_NAME: kafka-overwatch
       buildspec: .codebuild/build_images.yml
 
     - identifier: manifest

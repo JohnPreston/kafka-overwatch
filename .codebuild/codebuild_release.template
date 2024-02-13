@@ -195,6 +195,9 @@ Resources:
           - Name: MARKET_REPO_AWS_REGION
             Type: PLAINTEXT
             Value: us-east-1
+          - Name: ARBITRARY_INHERIT
+            Type: PLAINTEXT
+            Value: "SOMETHING"
       Source:
         Type: GITHUB
         ReportBuildStatus: true

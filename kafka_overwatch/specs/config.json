@@ -286,6 +286,9 @@
                   "type": "object",
                   "description": "Configuration as documented in https://github.com/confluentinc/librdkafka/blob/master/CONFIGURATION.md"
                 },
+                "schema_registry": {
+                  "$ref": "#/definitions/SchemaRegistry"
+                },
                 "cluster_config_auth": {
                   "type": "object",
                   "description": "Allows to set override configuration for secret values interpolation",
@@ -344,15 +347,18 @@
           "type": "string",
           "description": "The ARN of the MSK Cluster. This will be used to get the cluster details, including bootstrap details."
         },
+        "schema_registry": {
+          "$ref": "#/definitions/SchemaRegistry"
+        },
         "iam": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
             "ProfileName": {
-              "$ref": "#/definitions/IamOverride/properties/ProfileName"
+              "type": "string"
             },
             "AssumeRole": {
-              "$ref": "#/definitions/IamOverride/properties/AssumeRole"
+              "$ref": "#/definitions/IamOverride/definitions/AssumeRole"
             }
           }
         }
@@ -415,25 +421,7 @@
       }
     },
     "IamOverride": {
-      "type": "object",
-      "description": "Optional - IAM profile/settings override to use. Defaults to SDK settings.",
-      "oneOf": [
-        {
-          "required": [
-            "ProfileName"
-          ]
-        },
-        {
-          "required": [
-            "AssumeRole"
-          ]
-        }
-      ],
-      "properties": {
-        "ProfileName": {
-          "type": "string",
-          "description": "Optional - Use IAM profile to publish messages using another IAM profile"
-        },
+      "definitions": {
         "AssumeRole": {
           "type": "object",
           "required": [
@@ -455,7 +443,17 @@
             }
           }
         }
-      }
+      },
+      "description": "Optional - IAM profile/settings override to use. Defaults to SDK settings.",
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Optional - Use IAM profile to interact with AWS S3"
+        },
+        {
+          "$ref": "#/definitions/IamOverride/definitions/AssumeRole"
+        }
+      ]
     },
     "ClusterScanIntervalInSeconds": {
       "type": "integer",
@@ -574,6 +572,65 @@
           }
         }
       }
+    },
+    "confluentSchemaRegistry": {
+      "type": "object",
+      "$id": "confluentSchemaRegistry",
+      "title": "confluentSchemaRegistry",
+      "description": "Schema registry client configuration. Uses APIs of Confluent Schema Registry",
+      "required": [
+        "schema_registry_url"
+      ],
+      "properties": {
+        "schema_registry_url": {
+          "type": "string"
+        },
+        "basic_auth": {
+          "$id": "httpBasicAuth",
+          "title": "httpBasicAuth",
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "username": {
+                  "type": "string"
+                },
+                "password": {
+                  "type": "string"
+                }
+              }
+            },
+            {
+              "type": "string",
+              "description": "Username & password in the format username:password."
+            }
+          ]
+        }
+      }
+    },
+    "awsGlueSchemaRegistry": {
+      "type": "object",
+      "$id": "awsGlueSchemaRegistry",
+      "title": "awsGlueSchemaRegistry",
+      "description": "AWS Glue Schema Registry configuration.",
+      "properties": {
+        "registry_arn": {
+          "type": "string"
+        },
+        "iam_override": {
+          "$ref": "#/definitions/IamOverride"
+        }
+      }
+    },
+    "SchemaRegistry": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/confluentSchemaRegistry"
+        },
+        {
+          "$ref": "#/definitions/awsGlueSchemaRegistry"
+        }
+      ]
     }
   }
 }

@@ -21,7 +21,7 @@ def output_dataframe(
         kafka_cluster.s3_report.upload(
             content,
             file_name,
-            mimetypes=mime_type,
+            mime_type=mime_type,
         )
     if kafka_cluster.local_reports_directory_path:
         df_output_path: str = (

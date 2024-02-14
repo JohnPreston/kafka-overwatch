@@ -86,64 +86,7 @@ class BackupStyle(Enum):
     kafka_topics_sh = "kafka-topics.sh"
 
 
-@dataclass
-class AssumeRole:
-    RoleArn: str
-    """
-    Optional - IAM Role ARN to assume
-    """
-    RoleSessionName: str | None = "kafka-overwatch@aws"
-    """
-    Optional - Name of the session to use
-    """
-    ExternalId: str | None = None
-    """
-    Optional - External ID to use when assuming a role
-    """
-
-
-@dataclass
-class IamOverride1:
-    """
-    Optional - IAM profile/settings override to use. Defaults to SDK settings.
-    """
-
-    ProfileName: str
-    """
-    Optional - Use IAM profile to publish messages using another IAM profile
-    """
-    AssumeRole: AssumeRole | None = None
-
-
-@dataclass
-class IamOverride2:
-    """
-    Optional - IAM profile/settings override to use. Defaults to SDK settings.
-    """
-
-    AssumeRole: AssumeRole
-    ProfileName: str | None = None
-    """
-    Optional - Use IAM profile to publish messages using another IAM profile
-    """
-
-
-IamOverride = Union[IamOverride1, IamOverride2]
-
-
 ClusterScanIntervalInSeconds = int
-
-
-@dataclass
-class MskProvider:
-    iam_override: IamOverride | None = None
-    """
-    Override default session to perform the clusters discovery
-    """
-    exclude_regions: list[str] | None = None
-    """
-    List of regions not to look for MSK clusters
-    """
 
 
 @dataclass
@@ -156,15 +99,6 @@ class ConfluentCloudAuth:
     """
     The API Secret to perform API calls to Confluent Cloud
     """
-
-
-@dataclass
-class SaaSProviderAwsSecretsManager:
-    secret_id: str | None = None
-    """
-    Name or ARN of secret to use to store the key. If ARN is detected, existing secret content will be updated. If name is provided but not found, creates new secret.
-    """
-    iam_override: IamOverride | None = None
 
 
 @dataclass
@@ -192,7 +126,36 @@ class GovernanceReportingConfig:
     """
 
 
-ProfileName = str
+@dataclass
+class BasicAuth:
+    username: str | None = None
+    password: str | None = None
+
+
+@dataclass
+class ConfluentSchemaRegistry:
+    """
+    Schema registry client configuration. Uses APIs of Confluent Schema Registry
+    """
+
+    schema_registry_url: str
+    basic_auth: BasicAuth | str | None = None
+
+
+@dataclass
+class AssumeRole:
+    RoleArn: str
+    """
+    Optional - IAM Role ARN to assume
+    """
+    RoleSessionName: str | None = "kafka-overwatch@aws"
+    """
+    Optional - Name of the session to use
+    """
+    ExternalId: str | None = None
+    """
+    Optional - External ID to use when assuming a role
+    """
 
 
 @dataclass
@@ -227,6 +190,49 @@ class NotificationChannels:
     """
 
     sns: dict[str, SnsTopicChannel] | None = None
+
+
+@dataclass
+class Iam:
+    ProfileName: str | None = None
+    AssumeRole: AssumeRole | None = None
+
+
+IamOverride = Union[str, AssumeRole]
+
+
+@dataclass
+class MskProvider:
+    iam_override: IamOverride | None = None
+    """
+    Override default session to perform the clusters discovery
+    """
+    exclude_regions: list[str] | None = None
+    """
+    List of regions not to look for MSK clusters
+    """
+
+
+@dataclass
+class SaaSProviderAwsSecretsManager:
+    secret_id: str | None = None
+    """
+    Name or ARN of secret to use to store the key. If ARN is detected, existing secret content will be updated. If name is provided but not found, creates new secret.
+    """
+    iam_override: IamOverride | None = None
+
+
+@dataclass
+class AwsGlueSchemaRegistry:
+    """
+    AWS Glue Schema Registry configuration.
+    """
+
+    registry_arn: str | None = None
+    iam_override: IamOverride | None = None
+
+
+SchemaRegistry = Union[ConfluentSchemaRegistry, AwsGlueSchemaRegistry]
 
 
 @dataclass
@@ -294,16 +300,11 @@ class ClusterConfig:
     """
     Configuration as documented in https://github.com/confluentinc/librdkafka/blob/master/CONFIGURATION.md
     """
+    schema_registry: SchemaRegistry | None = None
     cluster_config_auth: ClusterConfigAuth | None = None
     """
     Allows to set override configuration for secret values interpolation
     """
-
-
-@dataclass
-class Iam:
-    ProfileName: ProfileName | None = None
-    AssumeRole: AssumeRole | None = None
 
 
 @dataclass
@@ -312,6 +313,7 @@ class MskClusterConfig:
     """
     The ARN of the MSK Cluster. This will be used to get the cluster details, including bootstrap details.
     """
+    schema_registry: SchemaRegistry | None = None
     iam: Iam | None = None
 
 

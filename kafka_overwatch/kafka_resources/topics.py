@@ -168,7 +168,7 @@ def define_topic_jobs(
             _topic_obj = kafka_cluster.topics[_topic.name]
         topic_jobs[_topic_name] = [
             _topic_obj,
-            kafka_cluster.consumer_client,
+            kafka_cluster.consumer_client(),
             _topic,
             now,
         ]

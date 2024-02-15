@@ -138,7 +138,6 @@ class KafkaCluster:
     def get_admin_client(self) -> AdminClient:
         return self._admin_client
 
-
     def consumer_client(self) -> Consumer:
         try:
             self._consumer_client.memberid()

@@ -35,7 +35,7 @@ def output_dataframe(
         KAFKA_LOG.info(f"{kafka_cluster.name} - Outputted DF to {df_output_path}")
 
 
-def export_topics_df(kafka_cluster: KafkaCluster, df: DataFrame) -> None:
+def export_df(kafka_cluster: KafkaCluster, df: DataFrame, resource_name: str) -> None:
     """
     If DF exporters are set, write/export to these.
     """
@@ -56,6 +56,6 @@ def export_topics_df(kafka_cluster: KafkaCluster, df: DataFrame) -> None:
             output_dataframe(
                 kafka_cluster,
                 export_fn(),
-                f"{kafka_cluster.name}.topics_dataframe.{export_type}",
+                f"{kafka_cluster.name}.{resource_name}_dataframe.{export_type}",
                 mime_type=export_to_mime[export_type],
             )

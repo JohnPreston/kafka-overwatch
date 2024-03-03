@@ -25,6 +25,7 @@ from kafka_overwatch.kafka_resources.groups import (
 from kafka_overwatch.kafka_resources.topics import describe_update_all_topics
 from kafka_overwatch.overwatch_resources.clusters import (
     KafkaCluster,
+    generate_cluster_consumer_groups_pd_dataframe,
     generate_cluster_topics_pd_dataframe,
 )
 
@@ -51,14 +52,16 @@ def measure_consumer_group_lags(
     to Prometheus.
     """
     for consumer_group in kafka_cluster.groups.values():
-        consumer_group_lag = consumer_group.get_lag()
+        consumer_group_lag = consumer_group.fetch_set_lag()
         for topic, topic_lag in consumer_group_lag.items():
             consumer_group_lag_gauge.labels(
                 kafka_cluster.name, consumer_group.group_id, topic
             ).set(topic_lag["total"])
 
 
-def generate_cluster_report(kafka_cluster: KafkaCluster, topics_df: DataFrame) -> None:
+def generate_cluster_report(
+    kafka_cluster: KafkaCluster, topics_df: DataFrame, groups_df: DataFrame
+) -> None:
     """
     Evaluates whether time to produce the report has passed.
     If so, generates and updates next monitoring time.
@@ -68,7 +71,7 @@ def generate_cluster_report(kafka_cluster: KafkaCluster, topics_df: DataFrame) -
         and kafka_cluster.next_reporting
         and (dt.utcnow() > kafka_cluster.next_reporting)
     ):
-        kafka_cluster.render_report(topics_df)
+        kafka_cluster.render_report(topics_df, groups_df)
         kafka_cluster.next_reporting = dt.utcnow() + td(
             seconds=kafka_cluster.config.reporting_config.evaluation_period_in_seconds
         )
@@ -114,6 +117,7 @@ def process_cluster(
         else:
             break
         topics_df = generate_cluster_topics_pd_dataframe(kafka_cluster)
+        groups_df = generate_cluster_consumer_groups_pd_dataframe(kafka_cluster)
         kafka_cluster.cluster_topics_count.set(len(topics_df["name"].values.tolist()))
         kafka_cluster.cluster_partitions_count.set(
             sum(topics_df["partitions"].values.tolist())
@@ -128,8 +132,9 @@ def process_cluster(
         KAFKA_LOG.info(f"{kafka_cluster.name} - {elapsed_time}s processing time.")
         KAFKA_LOG.info(f"{kafka_cluster.name} - Cluster topics stats")
         print(topics_df.describe())
+        print(groups_df.describe())
         measure_consumer_group_lags(kafka_cluster, consumer_group_lag_gauge)
-        generate_cluster_report(kafka_cluster, topics_df)
+        generate_cluster_report(kafka_cluster, topics_df, groups_df)
         time_to_wait = int(
             kafka_cluster.config.cluster_scan_interval_in_seconds - elapsed_time
         )

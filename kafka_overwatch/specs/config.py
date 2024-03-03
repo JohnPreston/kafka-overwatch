@@ -102,7 +102,7 @@ class ConfluentCloudAuth:
 
 
 @dataclass
-class TopicNamingConvention:
+class NamingConvention:
     """
     Evaluates topic name against one or more regex and reports non-compliant topics
     """
@@ -111,18 +111,6 @@ class TopicNamingConvention:
     ignore_regexes: list[str] | None = None
     """
     List/Array of regular expression of topic names to ignore for review. Use to ignore internal or stream topics
-    """
-
-
-@dataclass
-class GovernanceReportingConfig:
-    """
-    Configuration for governance cluster analysis
-    """
-
-    topic_naming_convention: TopicNamingConvention | None = None
-    """
-    Evaluates topic name against one or more regex and reports non-compliant topics
     """
 
 
@@ -220,6 +208,16 @@ class SaaSProviderAwsSecretsManager:
     Name or ARN of secret to use to store the key. If ARN is detected, existing secret content will be updated. If name is provided but not found, creates new secret.
     """
     iam_override: IamOverride | None = None
+
+
+@dataclass
+class GovernanceReportingConfig:
+    """
+    Configuration for governance cluster analysis
+    """
+
+    topic_naming_convention: NamingConvention | None = None
+    consumer_groups_naming_convention: NamingConvention | None = None
 
 
 @dataclass

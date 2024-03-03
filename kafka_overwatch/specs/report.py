@@ -16,39 +16,6 @@ class Metadata:
 
 
 @dataclass
-class TopicNamingConvention:
-    total_topics: float | None = None
-    """
-    Total number of topics in the cluster
-    """
-    total_topic_ignored: float | None = None
-    """
-    Total number of topics ignored via regex
-    """
-    total_topic_measured: float | None = None
-    """
-    Total number of topics measured
-    """
-    compliant_topic_percentage: float | None = None
-    """
-    Percentage of compliant topics, out of total_topic_measured
-    """
-    non_compliant_topics: list[str] | None = None
-    """
-    List of non-compliant topic names
-    """
-
-
-@dataclass
-class Governance:
-    """
-    Governance report structure
-    """
-
-    topic_naming_convention: TopicNamingConvention | None = None
-
-
-@dataclass
 class ConsumerGroups:
     total: int
     """
@@ -94,6 +61,40 @@ class TopicWasteCategory:
     """
     The percentage of topics fit into that category within the cluster
     """
+
+
+@dataclass
+class GovernanceNamingConventionReport:
+    total: float | None = None
+    """
+    Total number of consumer_groups in the cluster
+    """
+    total_ignored: float | None = None
+    """
+    Total number of consumer_groups ignored via regex
+    """
+    total_measured: float | None = None
+    """
+    Total number of consumer_groups measured
+    """
+    compliant_percentage: float | None = None
+    """
+    Percentage of compliant consumer_groups, out of total_topic_measured
+    """
+    non_compliant_resources: list[str] | None = None
+    """
+    List of non-compliant topic names
+    """
+
+
+@dataclass
+class Governance:
+    """
+    Governance report structure
+    """
+
+    topic_naming_convention: GovernanceNamingConventionReport | None = None
+    consumer_group_naming_convention: GovernanceNamingConventionReport | None = None
 
 
 @dataclass

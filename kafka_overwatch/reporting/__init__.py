@@ -13,16 +13,16 @@ if TYPE_CHECKING:
     from kafka_overwatch.overwatch_resources.clusters import KafkaCluster
 
 from kafka_overwatch.specs.config import GovernanceReportingConfig
-from kafka_overwatch.specs.config import (
-    TopicNamingConvention as TopicNamingConventionConfig,
-)
+from kafka_overwatch.specs.config import NamingConvention as NamingConventionConfig
 from kafka_overwatch.specs.report import ClusterReport, EstimatedWaste
 from kafka_overwatch.specs.report import Governance as GovReport
-from kafka_overwatch.specs.report import Metadata, Statistics
 from kafka_overwatch.specs.report import (
-    TopicNamingConvention as TopicNamingConventionReport,
+    GovernanceNamingConventionReport,
+    Metadata,
+    Statistics,
 )
 
+from .governance.consumer_groups_naming_convention import review_topic_naming
 from .governance.topic_naming_convention import review_topic_naming
 from .topics import process_cluster_topic_df
 
@@ -52,9 +52,9 @@ def set_cluster_topic_stats(topics_df) -> tuple[Statistics, EstimatedWaste]:
     return cluster_stats, estimate
 
 
-def get_topic_naming_convention_report(
+def get_naming_convention_report(
     topics_df: DataFrame, governance_config: GovernanceReportingConfig
-) -> TopicNamingConventionReport:
+) -> GovernanceNamingConventionReport:
     gov_df = review_topic_naming(
         topics_df,
         governance_config.topic_naming_convention.regexes,
@@ -67,33 +67,45 @@ def get_topic_naming_convention_report(
     non_compliance: float = (len(non_compliant_topics) * 100) / (
         len(gov_df) - len(excluded_topics)
     )
-    naming_convention_report = TopicNamingConventionReport(
-        non_compliant_topics=non_compliant_topics,
-        total_topic_ignored=len(excluded_topics),
-        total_topic_measured=len(gov_df) - len(excluded_topics),
-        compliant_topic_percentage=non_compliance,
-        total_topics=len(gov_df),
+    naming_convention_report = GovernanceNamingConventionReport(
+        non_compliant_resources=non_compliant_topics,
+        total_ignored=len(excluded_topics),
+        total_measured=len(gov_df) - len(excluded_topics),
+        compliant_percentage=100 - non_compliance,
+        total=len(gov_df),
     )
     return naming_convention_report
 
 
 def get_cluster_governance(
-    governance_config: GovernanceReportingConfig, topics_df: DataFrame
+    governance_config: GovernanceReportingConfig,
+    topics_df: DataFrame,
+    groups_df: DataFrame,
 ) -> GovReport:
     if governance_config.topic_naming_convention:
-        naming_convention_report = get_topic_naming_convention_report(
+        naming_convention_report = get_naming_convention_report(
             topics_df, governance_config
         )
     else:
         naming_convention_report = None
+    if governance_config.consumer_groups_naming_convention:
+        consumer_group_naming_convention_report = get_naming_convention_report(
+            groups_df, governance_config
+        )
+    else:
+        consumer_group_naming_convention_report = None
     gov_report = GovReport(
         topic_naming_convention=naming_convention_report,
+        consumer_group_naming_convention=consumer_group_naming_convention_report,
     )
     return gov_report
 
 
 def get_cluster_usage(
-    cluster_name: str, kafka_cluster: KafkaCluster, topics_df: DataFrame
+    cluster_name: str,
+    kafka_cluster: KafkaCluster,
+    topics_df: DataFrame,
+    groups_df: DataFrame,
 ) -> ClusterReport:
     """
     Based on the topics to monitor, as per the configuration, evaluates the usage of the topics identified.
@@ -102,7 +114,7 @@ def get_cluster_usage(
     topics_stats, topics_waste_estimate = set_cluster_topic_stats(topics_df)
     if kafka_cluster.config.governance:
         governance_report = get_cluster_governance(
-            kafka_cluster.config.governance, topics_df
+            kafka_cluster.config.governance, topics_df, groups_df
         )
     else:
         governance_report = None

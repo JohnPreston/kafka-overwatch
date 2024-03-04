@@ -26,6 +26,7 @@ class ConsumerGroup:
         self._members: list = []
         self._init_time = dt.utcnow()
         self._partitions_offsets = None
+        self._lag: dict[str, dict] = {}
 
     def __repr__(self):
         return self._group_id
@@ -83,8 +84,22 @@ class ConsumerGroup:
             return True
         return False
 
-    def get_lag(self, topic_name: str = None) -> dict[str, dict]:
-        """Returns the lag for a topic"""
+    @property
+    def pd_frame_data(self) -> dict:
+        elapsed_time = dt.utcnow() - self._init_time
+        return {
+            "name": self.group_id,
+            "members": len(self.members),
+            "state": self.state,
+            "eval_elapsed_time": elapsed_time.total_seconds(),
+            "overall_lag": sum([_topic["total"] for _topic in self._lag.values()]),
+        }
+
+    def fetch_set_lag(self, topic_name: str = None) -> dict[str, dict]:
+        """
+        Returns the lag for a topic and its partitions
+        If topic_name is set, returns the lag for that topic alone.
+        """
         lag: dict[str, dict] = {}
         for overwatch_topic, cg_topic_partitions in self.topic_offsets.items():
             partitions_lag: list = []
@@ -123,6 +138,7 @@ class ConsumerGroup:
                     "total": total_lag,
                     "partitions": partitions_lag,
                 }
+        self._lag = lag
         if topic_name and topic_name in lag:
             return lag[topic_name]
         return lag

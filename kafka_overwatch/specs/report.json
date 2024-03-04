@@ -39,38 +39,10 @@
           "description": "Governance report structure",
           "properties": {
             "topic_naming_convention": {
-              "type": "object",
-              "properties": {
-                "total_topics": {
-                  "type": "number",
-                  "minimum": 1,
-                  "description": "Total number of topics in the cluster"
-                },
-                "total_topic_ignored": {
-                  "type": "number",
-                  "minimum": 0,
-                  "description": "Total number of topics ignored via regex"
-                },
-                "total_topic_measured": {
-                  "type": "number",
-                  "minimum": 0,
-                  "description": "Total number of topics measured"
-                },
-                "compliant_topic_percentage": {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 100,
-                  "description": "Percentage of compliant topics, out of total_topic_measured"
-                },
-                "non_compliant_topics": {
-                  "type": "array",
-                  "description": "List of non-compliant topic names",
-                  "items": {
-                    "type": "string",
-                    "description": "Topic name that is not compliant"
-                  }
-                }
-              }
+              "$ref": "#/definitions/governance_naming_convention_report"
+            },
+            "consumer_group_naming_convention": {
+              "$ref": "#/definitions/governance_naming_convention_report"
             }
           }
         },
@@ -184,6 +156,40 @@
         "description": {
           "type": "string",
           "description": "The description of the category"
+        }
+      }
+    },
+    "governance_naming_convention_report": {
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "number",
+          "minimum": 1,
+          "description": "Total number of consumer_groups in the cluster"
+        },
+        "total_ignored": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Total number of consumer_groups ignored via regex"
+        },
+        "total_measured": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Total number of consumer_groups measured"
+        },
+        "compliant_percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Percentage of compliant consumer_groups, out of total_topic_measured"
+        },
+        "non_compliant_resources": {
+          "type": "array",
+          "description": "List of non-compliant topic names",
+          "items": {
+            "type": "string",
+            "description": "Topic name that is not compliant"
+          }
         }
       }
     }

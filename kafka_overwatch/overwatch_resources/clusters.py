@@ -11,7 +11,7 @@ from queue import Queue
 from typing import TYPE_CHECKING
 
 from kafka_overwatch.reporting import get_cluster_usage
-from kafka_overwatch.reporting.tools import export_topics_df
+from kafka_overwatch.reporting.tools import export_df
 
 if TYPE_CHECKING:
     from confluent_kafka.admin import AdminClient
@@ -242,10 +242,11 @@ fi
                 bash_script, f"{self.name}_restore.sh", "application/x-sh"
             )
 
-    def render_report(self, topics_df: DataFrame) -> None:
+    def render_report(self, topics_df: DataFrame, groups_df: DataFrame) -> None:
         KAFKA_LOG.info(f"Producing report for {self.name}")
-        report = get_cluster_usage(self.name, self, topics_df)
-        export_topics_df(self, topics_df)
+        report = get_cluster_usage(self.name, self, topics_df, groups_df)
+        export_df(self, topics_df, "topics")
+        export_df(self, groups_df, "groups")
         file_name = f"{self.name}.overwatch-report.json"
         if self.local_reports_directory_path:
             file_path: str = path.abspath(
@@ -281,3 +282,16 @@ def generate_cluster_topics_pd_dataframe(kafka_cluster: KafkaCluster) -> DataFra
     )
 
     return topics_df
+
+
+def generate_cluster_consumer_groups_pd_dataframe(
+    kafka_cluster: KafkaCluster,
+) -> DataFrame:
+    consumer_groups_data: list[dict] = []
+    for consumer_group in kafka_cluster.groups.values():
+        consumer_groups_data.append(consumer_group.pd_frame_data)
+    consumer_groups_df = DataFrame(consumer_groups_data)
+    consumer_groups_df["eval_elapsed_time"] = consumer_groups_df[
+        "eval_elapsed_time"
+    ].astype(int)
+    return consumer_groups_df

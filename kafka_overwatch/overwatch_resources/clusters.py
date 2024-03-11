@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from kafka_overwatch.overwatch_resources.groups import ConsumerGroup
     from kafka_overwatch.overwatch_resources.topics import Topic
     from kafka_overwatch.config.config import OverwatchConfig
+    from kafka_overwatch.notifications.aws_sns import SnsChannel
 
 import threading
 from datetime import datetime as dt
@@ -67,6 +68,8 @@ class KafkaCluster:
         self.s3_report: S3Handler | None = None
         self.local_reports_directory_path = None
         self.s3_backup = None
+        self.sns_channels: dict[str, dict] = {}
+        self.assign_sns_channels(overwatch_config, config)
 
         self.next_reporting = dt.utcnow() + td(
             seconds=config.reporting_config.evaluation_period_in_seconds
@@ -103,6 +106,24 @@ class KafkaCluster:
     @property
     def config(self) -> ClusterConfiguration:
         return self._cluster_config
+
+    def assign_sns_channels(
+        self, overwatch_config: OverwatchConfig, config: ClusterConfiguration
+    ):
+        """
+        Maps the SNS channels defined at the root of the configuration to the ones defined for
+        the cluster. This will make it easy to send notifications for each of these channels
+        """
+        if (
+            overwatch_config.sns_channels
+            and config.reporting_config.notification_channels.sns
+        ):
+            for sns_channel in config.reporting_config.notification_channels.sns:
+                if sns_channel.name in overwatch_config.sns_channels:
+                    self.sns_channels[sns_channel.name] = {
+                        "topic": overwatch_config.sns_channels[sns_channel.name],
+                        "sign": sns_channel.sign_s3_url,
+                    }
 
     def check_replace_kafka_clients(self):
         replace_admin: bool = False
@@ -264,7 +285,17 @@ fi
                 KAFKA_LOG.exception(error)
                 KAFKA_LOG.error(f"Error while saving report to {file_path}: {error}")
         if self.s3_report:
-            self.s3_report.upload(json.dumps(asdict(report), indent=2), file_name)
+            upload_path: str = self.s3_report.upload(
+                json.dumps(asdict(report), indent=2), file_name
+            )
+            for channel_name, channel in self.sns_channels.items():
+                topic = channel["topic"]
+                topic.send_usage_report_notification(
+                    self,
+                    f"{self.name} - Kafka overwatch report available",
+                    s3_uri=f"s3://{upload_path}",
+                    s3_url=f"https://s3.amazonaws.com/{upload_path}",
+                )
 
 
 def generate_cluster_topics_pd_dataframe(kafka_cluster: KafkaCluster) -> DataFrame:

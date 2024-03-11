@@ -32,10 +32,6 @@ class Template:
     """
     Optional - Path to a template for SNS Email messages
     """
-    sms: str | None = None
-    """
-    Optional - Path to a template for SNS SMS messages
-    """
 
 
 @dataclass
@@ -128,6 +124,16 @@ class ConfluentSchemaRegistry:
 
     schema_registry_url: str
     basic_auth: BasicAuth | str | None = None
+
+
+@dataclass
+class ClusterReportSnsChannel:
+    """
+    Sns topic to send the messages to
+    """
+
+    name: str
+    sign_s3_url: bool | float | None = None
 
 
 @dataclass
@@ -234,6 +240,18 @@ SchemaRegistry = Union[ConfluentSchemaRegistry, AwsGlueSchemaRegistry]
 
 
 @dataclass
+class ClusterReportingNotificationChannels:
+    """
+    Channels to send notifications to when reports have been generated.
+    """
+
+    sns: list[ClusterReportSnsChannel] | None = None
+    """
+    List of SNS channels defined in notifications_channels
+    """
+
+
+@dataclass
 class S3Output:
     bucket_name: str | None = None
     """
@@ -273,6 +291,7 @@ class ReportingConfig:
     """
     Interval between reports.
     """
+    notification_channels: ClusterReportingNotificationChannels | None = None
     output_formats: OutputFormats | None = None
     """
     The different types of outputs to produce.

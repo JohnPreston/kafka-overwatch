@@ -125,6 +125,7 @@
     },
     "NotificationChannels": {
       "type": "object",
+      "id": "ConfigNotificationChannels",
       "description": "Channels to send notifications to when reports have been generated.",
       "additionalProperties": false,
       "properties": {
@@ -166,10 +167,6 @@
             "email": {
               "type": "string",
               "description": "Optional - Path to a template for SNS Email messages"
-            },
-            "sms": {
-              "type": "string",
-              "description": "Optional - Path to a template for SNS SMS messages"
             }
           }
         }
@@ -225,6 +222,9 @@
           "minimum": 60,
           "description": "Interval between reports.",
           "default": 60
+        },
+        "notification_channels": {
+          "$ref": "#/definitions/cluster_reporting_notification_channels"
         },
         "output_formats": {
           "type": "object",
@@ -637,6 +637,51 @@
           "$ref": "#/definitions/awsGlueSchemaRegistry"
         }
       ]
+    },
+    "cluster_reporting_notification_channels": {
+      "type": "object",
+      "id": "cluster_reporting_notification_channels",
+      "description": "Channels to send notifications to when reports have been generated.",
+      "additionalProperties": false,
+      "properties": {
+        "sns": {
+          "type": "array",
+          "description": "List of SNS channels defined in notifications_channels",
+          "items": {
+            "$ref": "#/definitions/cluster_report_sns_channel"
+          }
+        }
+      }
+    },
+    "cluster_report_sns_channel": {
+      "type": "object",
+      "id": "cluster_report_sns_channel",
+      "description": "Sns topic to send the messages to",
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "patternProperties": {
+        "x-": {}
+      },
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "sign_s3_url": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "number",
+              "minimum": 900,
+              "maximum": 604800,
+              "description": "Maximum lifetime for the signed URL. See AWS docs for valid values."
+            }
+          ]
+        }
+      }
     }
   }
 }

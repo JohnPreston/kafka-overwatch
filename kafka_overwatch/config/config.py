@@ -16,6 +16,7 @@ from prometheus_client import CollectorRegistry, multiprocess
 from kafka_overwatch.monitoring.prometheus import (
     set_cluster_prometheus_registry_collectors,
 )
+from kafka_overwatch.notifications.aws_sns import SnsChannel
 from kafka_overwatch.specs.config import Global
 
 
@@ -44,6 +45,8 @@ class OverwatchConfig:
         multiprocess.MultiProcessCollector(
             self.prometheus_registry, path=self._prometheus_registry_dir.name
         )
+        self.sns_channels: dict[str, SnsChannel] = {}
+        self.init_notification_channels()
 
     def __reduce__(self):
         # Return a tuple with the callable and its arguments
@@ -56,3 +59,15 @@ class OverwatchConfig:
     @property
     def prometheus_registry_dir(self) -> TemporaryDirectory:
         return self._prometheus_registry_dir
+
+    def init_notification_channels(self):
+        if not self._config.notification_channels:
+            return
+        if not self._config.notification_channels.sns:
+            return
+        for (
+            sns_channel_name,
+            sns_channel_definition,
+        ) in self._config.notification_channels.sns.items():
+            sns_channel = SnsChannel(sns_channel_name, sns_channel_definition)
+            self.sns_channels[sns_channel_name] = sns_channel

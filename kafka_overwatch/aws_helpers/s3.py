@@ -50,11 +50,16 @@ class S3Handler:
         return self.session.client("s3")
 
     @retry((S3UploadFailedError,), tries=3, delay=1, logger=KAFKA_LOG)
-    def upload(self, report: str, report_name: str, mime_type: str = None):
+    def upload(
+        self, report: str, report_name: str, mime_type: str = None
+    ) -> str | None:
         prefix_key: str = (
             f"{self._config.prefix_key}/{report_name}"
             if self._config.prefix_key != ""
             else report_name
+        )
+        upload_path: str = (
+            f"{self.config.bucket_name}/{self.config.prefix_key}/{report_name}"
         )
         try:
             self.client.put_object(
@@ -63,11 +68,8 @@ class S3Handler:
                 Body=report.encode("utf-8"),
                 ContentType="application/json" if not mime_type else mime_type,
             )
-            KAFKA_LOG.info(
-                "File uploaded to "
-                f"{self.config.bucket_name}/{self.config.prefix_key}/{report_name}"
-            )
-            return
+            KAFKA_LOG.info(f"File uploaded to {upload_path}")
+            return upload_path
         except ClientError as error:
             KAFKA_LOG.exception(error)
             KAFKA_LOG.error(

@@ -46,7 +46,7 @@ codeguru-profiler-agent = "^1.2.4"
 kafka-schema-registry-admin = "^0.4.1"
 
 [tool.poetry.group.dev.dependencies]
-black = "^23.12"
+black = ">=23.12,<25.0"
 isort = "^5.13"
 pyupgrade = "^3.15"
 pre-commit = "^3.6"

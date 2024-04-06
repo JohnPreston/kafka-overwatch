@@ -72,6 +72,16 @@
       "$ref": "#/definitions/NotificationChannels",
       "description": "Allows to define notification channels for reporting (not yet implemented)."
     },
+    "schema_registries": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-zA-Z\\d\\-_]+$": {
+          "$ref": "#/definitions/SchemaRegistry"
+        },
+        "^x-": {}
+      }
+    },
     "aws_emf": {
       "type": "object",
       "properties": {
@@ -287,7 +297,8 @@
                   "description": "Configuration as documented in https://github.com/confluentinc/librdkafka/blob/master/CONFIGURATION.md"
                 },
                 "schema_registry": {
-                  "$ref": "#/definitions/SchemaRegistry"
+                  "type": "string",
+                  "description": "Name of the schema registry defined at the top level."
                 },
                 "cluster_config_auth": {
                   "type": "object",
@@ -626,17 +637,51 @@
         "iam_override": {
           "$ref": "#/definitions/IamOverride"
         }
-      }
+      },
+      "required": [
+        "registry_arn"
+      ]
     },
     "SchemaRegistry": {
-      "oneOf": [
-        {
-          "$ref": "#/definitions/confluentSchemaRegistry"
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "x-": {}
+      },
+      "required": [
+        "config"
+      ],
+      "properties": {
+        "config": {
+          "oneOf": [
+            {
+              "$ref": "#/definitions/confluentSchemaRegistry"
+            },
+            {
+              "$ref": "#/definitions/awsGlueSchemaRegistry"
+            }
+          ]
         },
-        {
-          "$ref": "#/definitions/awsGlueSchemaRegistry"
+        "backup_config": {
+          "type": "object",
+          "description": "Configuration for schema registry schemas & subjects backup",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Turn backup on"
+            },
+            "S3": {
+              "$ref": "#/definitions/S3Output"
+            }
+          }
+        },
+        "schema_registry_scan_interval": {
+          "type": "integer",
+          "minimum": 10,
+          "description": "Interval, in seconds, between two scans of the schema registry.",
+          "default": 300
         }
-      ]
+      }
     },
     "cluster_reporting_notification_channels": {
       "type": "object",

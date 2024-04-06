@@ -5,9 +5,10 @@ from __future__ import annotations
 
 import concurrent.futures
 import json
+import mmap
+import pickle
 from dataclasses import asdict
 from os import makedirs, path
-from queue import Queue
 from typing import TYPE_CHECKING
 
 from kafka_overwatch.reporting import get_cluster_usage
@@ -19,9 +20,7 @@ if TYPE_CHECKING:
     from kafka_overwatch.overwatch_resources.groups import ConsumerGroup
     from kafka_overwatch.overwatch_resources.topics import Topic
     from kafka_overwatch.config.config import OverwatchConfig
-    from kafka_overwatch.notifications.aws_sns import SnsChannel
 
-import threading
 from datetime import datetime as dt
 from datetime import timedelta as td
 
@@ -35,6 +34,7 @@ from kafka_overwatch.aws_helpers.s3 import S3Handler
 from kafka_overwatch.config.logging import KAFKA_LOG
 from kafka_overwatch.kafka_resources import set_admin_client, set_consumer_client
 from kafka_overwatch.kafka_resources.topics import get_filtered_topics_list
+from kafka_overwatch.overwatch_resources.schema_registry import SchemaRegistry
 from kafka_overwatch.specs.config import (
     ClusterConfiguration,
     ClusterTopicBackupConfig,
@@ -48,7 +48,6 @@ class KafkaCluster:
     ):
         self.name = name
         self.keep_running: bool = True
-        self.stop_flag = threading.Event()
 
         if not config.reporting_config.exports:
             config.reporting_config.exports = Exports()
@@ -70,10 +69,20 @@ class KafkaCluster:
         self.s3_backup = None
         self.sns_channels: dict[str, dict] = {}
         self.assign_sns_channels(overwatch_config, config)
-
+        self._schema_registry: str | None = None
         self.next_reporting = dt.utcnow() + td(
-            seconds=config.reporting_config.evaluation_period_in_seconds
+            seconds=self.config.reporting_config.evaluation_period_in_seconds
         )
+        self.cluster_brokers_count: int = 0
+        if (
+            self.config.cluster_config.schema_registry
+            in overwatch_config.schema_registries
+        ):
+            self._schema_registry = overwatch_config.schema_registries[
+                self.config.cluster_config.schema_registry
+            ].mmap_file
+
+    def init_cluster_processing(self, overwatch_config):
         cluster_partitions_count: Gauge = self.prometheus_collectors[
             "cluster_partitions_count"
         ]
@@ -98,11 +107,6 @@ class KafkaCluster:
         self.topics_describe_latency = topics_describe_latency.labels(cluster=self.name)
         self.groups_describe_latency = groups_describe_latency.labels(cluster=self.name)
 
-        self.topics_watermarks_queue = Queue()
-        self.groups_describe_queue = Queue()
-
-        self.cluster_brokers_count: int = 0
-
     @property
     def config(self) -> ClusterConfiguration:
         return self._cluster_config
@@ -116,6 +120,7 @@ class KafkaCluster:
         """
         if (
             overwatch_config.sns_channels
+            and config.reporting_config.notification_channels
             and config.reporting_config.notification_channels.sns
         ):
             for sns_channel in config.reporting_config.notification_channels.sns:
@@ -155,6 +160,30 @@ class KafkaCluster:
             if replace_admin:
                 client_config = eval_kafka_client_config(self)
                 self._admin_client: AdminClient = set_admin_client(client_config)
+
+    def get_schema_registry(self) -> SchemaRegistry | None:
+        """
+        If the SR has produced a binary file for it, retrieves and loads the class.
+        This works around the fact that the SR data is processed in a different process therefore
+        the data it has is not updated in the cluster thread.
+        If not found or not set, ignore and consider Kafka Cluster does not have SR data available yet.
+        Which can occur if the SR processing has not yet yielded results.
+        """
+        sr_bin_file_path: str = self._schema_registry
+        if sr_bin_file_path is None:
+            return
+        try:
+            with open(sr_bin_file_path, "r+b") as schema_bin_fd:
+                mm = mmap.mmap(schema_bin_fd.fileno(), 0)
+            serialized_data = mm[:]
+            deserialized_obj = pickle.loads(serialized_data)
+            return deserialized_obj
+        except OSError:
+            print(f"Unable to open {sr_bin_file_path}")
+        except Exception as error:
+            print("Error with processing SR details")
+            print(error)
+        return None
 
     def get_admin_client(self) -> AdminClient:
         return self._admin_client
@@ -228,13 +257,6 @@ class KafkaCluster:
                     self.s3_backup = S3Handler(self.config.topics_backup_config.S3)
                 except Exception:
                     pass
-
-    def exit_gracefully(self, pid, frame):
-        KAFKA_LOG.warning(
-            f"Cluster {self.name} - Attempt to exit gracefully due to signal/interruption - {pid}"
-        )
-        self.keep_running = False
-        self.stop_flag.set()
 
     def render_restore_files(self) -> None:
         """

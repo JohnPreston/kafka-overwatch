@@ -15,9 +15,11 @@ from confluent_kafka import ConsumerGroupTopicPartitions
 from confluent_kafka.error import KafkaError, KafkaException
 from retry import retry
 
+from kafka_overwatch.common import waiting_on_futures
 from kafka_overwatch.config.logging import KAFKA_LOG
 from kafka_overwatch.kafka_resources import wait_for_result
 from kafka_overwatch.overwatch_resources.groups import ConsumerGroup
+from kafka_overwatch.processing import stop_flag
 
 
 def get_consumer_groups_desc(
@@ -135,23 +137,45 @@ def set_update_cluster_consumer_groups(
             ): job_params
             for job_params in groups_jobs.values()
         }
-        while completed < _tasks:
-            for _future in concurrent.futures.as_completed(futures_to_data):
-                if not kafka_cluster.keep_running or kafka_cluster.stop_flag.is_set():
-                    executor.shutdown(wait=False, cancel_futures=True)
-                    break
-                if _future.exception():
-                    data = retry_kafka_describe_update_consumer_group_offsets(
-                        _future, futures_to_data, executor
-                    )
-                    print(f"Failure, retrying {data}")
-                else:
-                    KAFKA_LOG.debug(_future.result())
-                    completed += 1
-                futures_to_data.pop(_future)
-            else:
-                continue
-            break
+        _pending = len(futures_to_data)
+        KAFKA_LOG.info(f"Kafka cluster: {kafka_cluster.name} | CGs to scan: {_pending}")
+        waiting_on_futures(
+            executor,
+            futures_to_data,
+            "Kafka Cluster",
+            kafka_cluster.name,
+            "Consumer groups",
+        )
+
+        # while _pending > 0:
+        #     if stop_flag.is_set():
+        #         for _future in futures_to_data:
+        #             _future.cancel()
+        #         executor.shutdown(wait=False, cancel_futures=True)
+        #         return
+        #     _, other = concurrent.futures.wait(futures_to_data, timeout=5)
+        #     _pending = len([_f for _f in other if not _f.done()])
+        #     KAFKA_LOG.info(
+        #         "Kafka cluster: %s | CGs Pending: %s" % (kafka_cluster.name, _pending)
+        #     )
+
+        # while completed < _tasks:
+        #     for _future in concurrent.futures.as_completed(futures_to_data):
+        #         if not kafka_cluster.keep_running or stop_flag.is_set():
+        #             executor.shutdown(wait=False, cancel_futures=True)
+        #             return
+        #         if _future.exception():
+        #             data = retry_kafka_describe_update_consumer_group_offsets(
+        #                 _future, futures_to_data, executor
+        #             )
+        #             print(f"Failure, retrying {data}")
+        #         else:
+        #             KAFKA_LOG.debug(_future.result())
+        #             completed += 1
+        #         futures_to_data.pop(_future)
+        #     else:
+        #         continue
+        #     break
 
 
 def describe_update_consumer_group_offsets(

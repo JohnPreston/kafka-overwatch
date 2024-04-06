@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 
 from tempfile import TemporaryDirectory
 
+from cryptography.fernet import Fernet
 from dacite import from_dict
 from prometheus_client import CollectorRegistry, multiprocess
 
@@ -17,6 +18,7 @@ from kafka_overwatch.monitoring.prometheus import (
     set_cluster_prometheus_registry_collectors,
 )
 from kafka_overwatch.notifications.aws_sns import SnsChannel
+from kafka_overwatch.overwatch_resources.schema_registry import SchemaRegistry
 from kafka_overwatch.specs.config import Global
 
 
@@ -45,7 +47,10 @@ class OverwatchConfig:
         multiprocess.MultiProcessCollector(
             self.prometheus_registry, path=self._prometheus_registry_dir.name
         )
+        self.runtime_key = Fernet.generate_key()
         self.sns_channels: dict[str, SnsChannel] = {}
+        self.schema_registries: dict[str, SchemaRegistry] = {}
+        self.init_schema_registries()
         self.init_notification_channels()
 
     def __reduce__(self):
@@ -59,6 +64,12 @@ class OverwatchConfig:
     @property
     def prometheus_registry_dir(self) -> TemporaryDirectory:
         return self._prometheus_registry_dir
+
+    def init_schema_registries(self):
+        """Initializes the Schema Registries client if setup in the configuration"""
+        for registry_name, registry in self.input_config.schema_registries.items():
+            _registry = SchemaRegistry(registry_name, registry, self.runtime_key)
+            self.schema_registries[registry_name] = _registry
 
     def init_notification_channels(self):
         if not self._config.notification_channels:

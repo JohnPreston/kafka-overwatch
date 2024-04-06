@@ -43,7 +43,8 @@ jinja2 = "^3.1.2"
 aws-msk-iam-sasl-signer-python = "^1.0.0"
 pandas = "^2.1.4"
 codeguru-profiler-agent = "^1.2.4"
-kafka-schema-registry-admin = "^0.4.1"
+kafka-schema-registry-admin = ">=0.5"
+cryptography = "^42.0.5"
 
 [tool.poetry.group.dev.dependencies]
 black = ">=23.12,<25.0"

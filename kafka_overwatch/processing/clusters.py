@@ -12,10 +12,8 @@ if TYPE_CHECKING:
 
 import os
 import signal
-import time
 from datetime import datetime as dt
 from datetime import timedelta as td
-from threading import Event
 
 from kafka_overwatch.config.logging import KAFKA_LOG
 from kafka_overwatch.kafka_resources.groups import (
@@ -29,8 +27,7 @@ from kafka_overwatch.overwatch_resources.clusters import (
     generate_cluster_topics_pd_dataframe,
 )
 
-FOREVER = 42
-stop_flag = Event()
+from . import FOREVER, handle_signals, stop_flag, wait_between_intervals
 
 
 def ensure_prometheus_multiproc(prometheus_dir_path: str):
@@ -77,14 +74,8 @@ def generate_cluster_report(
         )
 
 
-def handle_signals(pid, frame):
-    print("Cluster processing received signal to stop", pid, frame)
-    global stop_flag
-    stop_flag.set()
-
-
 def process_cluster(
-    cluster_name: str, cluster_config, overwatch_config: OverwatchConfig
+    cluster_name: str, kafka_cluster: KafkaCluster, overwatch_config: OverwatchConfig
 ):
     """
     Initialize the Kafka cluster monitoring/evaluation loop.
@@ -92,16 +83,13 @@ def process_cluster(
     """
     signal.signal(signal.SIGINT, handle_signals)
     signal.signal(signal.SIGTERM, handle_signals)
+    kafka_cluster.init_cluster_processing(overwatch_config)
     ensure_prometheus_multiproc(overwatch_config.prometheus_registry_dir.name)
-    kafka_cluster = KafkaCluster(
-        cluster_name, cluster_config, overwatch_config=overwatch_config
-    )
     kafka_cluster.set_reporting_exporters()
     kafka_cluster.set_cluster_connections()
     consumer_group_lag_gauge = overwatch_config.prometheus_collectors[
         "consumer_group_lag"
     ]
-
     while FOREVER:
         kafka_cluster.check_replace_kafka_clients()
         kafka_cluster.set_cluster_properties()
@@ -138,16 +126,14 @@ def process_cluster(
         time_to_wait = int(
             kafka_cluster.config.cluster_scan_interval_in_seconds - elapsed_time
         )
-        if time_to_wait <= 0:
-            print(
+        wait_between_intervals(
+            time_to_wait,
+            (
                 f"{kafka_cluster.name} - interval set to {kafka_cluster.config.cluster_scan_interval_in_seconds}"
                 f", however it takes {elapsed_time}s to complete the scan. Consider changing scan interval"
-            )
-        else:
-            for _ in range(1, time_to_wait):
-                if stop_flag.is_set():
-                    break
-                time.sleep(1)
+            ),
+        )
+
     return
 
 
@@ -164,3 +150,7 @@ def process_cluster_resources(kafka_cluster: KafkaCluster):
             update_set_consumer_group_topics_partitions_offsets(
                 kafka_cluster, consumer_group
             )
+    if not stop_flag.is_set():
+        cluster_sr = kafka_cluster.get_schema_registry()
+        if cluster_sr:
+            print(len(cluster_sr.subjects), len(cluster_sr.schemas))

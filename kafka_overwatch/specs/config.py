@@ -232,11 +232,8 @@ class AwsGlueSchemaRegistry:
     AWS Glue Schema Registry configuration.
     """
 
-    registry_arn: str | None = None
+    registry_arn: str
     iam_override: IamOverride | None = None
-
-
-SchemaRegistry = Union[ConfluentSchemaRegistry, AwsGlueSchemaRegistry]
 
 
 @dataclass
@@ -317,21 +314,14 @@ class ClusterConfig:
     """
     Configuration as documented in https://github.com/confluentinc/librdkafka/blob/master/CONFIGURATION.md
     """
-    schema_registry: SchemaRegistry | None = None
+    schema_registry: str | None = None
+    """
+    Name of the schema registry defined at the top level.
+    """
     cluster_config_auth: ClusterConfigAuth | None = None
     """
     Allows to set override configuration for secret values interpolation
     """
-
-
-@dataclass
-class MskClusterConfig:
-    cluster_arn: str | None = None
-    """
-    The ARN of the MSK Cluster. This will be used to get the cluster details, including bootstrap details.
-    """
-    schema_registry: SchemaRegistry | None = None
-    iam: Iam | None = None
 
 
 @dataclass
@@ -404,6 +394,32 @@ class ConfluentProvider:
 
 
 @dataclass
+class BackupConfig:
+    """
+    Configuration for schema registry schemas & subjects backup
+    """
+
+    enabled: bool | None = None
+    """
+    Turn backup on
+    """
+    S3: S3Output | None = None
+
+
+@dataclass
+class SchemaRegistry:
+    config: ConfluentSchemaRegistry | AwsGlueSchemaRegistry
+    backup_config: BackupConfig | None = None
+    """
+    Configuration for schema registry schemas & subjects backup
+    """
+    schema_registry_scan_interval: int | None = 300
+    """
+    Interval, in seconds, between two scans of the schema registry.
+    """
+
+
+@dataclass
 class Providers:
     """
     Allows to define a Kafka SaaS provider and perform discovery of existing clusters to scan. (Not yet implemented)
@@ -422,6 +438,16 @@ class Providers:
     """
     Gateways to monitor and import the vClusters from the partitions usage
     """
+
+
+@dataclass
+class MskClusterConfig:
+    cluster_arn: str | None = None
+    """
+    The ARN of the MSK Cluster. This will be used to get the cluster details, including bootstrap details.
+    """
+    schema_registry: SchemaRegistry | None = None
+    iam: Iam | None = None
 
 
 @dataclass
@@ -465,4 +491,5 @@ class KafkaOverwatchInputConfiguration:
     """
     Allows to define notification channels for reporting (not yet implemented).
     """
+    schema_registries: dict[str, SchemaRegistry] | dict[str, Any] | None = None
     aws_emf: AwsEmfModel | None = None

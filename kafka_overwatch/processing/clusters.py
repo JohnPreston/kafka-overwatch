@@ -68,9 +68,7 @@ def generate_cluster_report(
         )
 
 
-def process_cluster(
-    cluster_name: str, kafka_cluster: KafkaCluster, overwatch_config: OverwatchConfig
-):
+def process_cluster(kafka_cluster: KafkaCluster, overwatch_config: OverwatchConfig):
     """
     Initialize the Kafka cluster monitoring/evaluation loop.
     Creates the cluster, which creates the Kafka clients.

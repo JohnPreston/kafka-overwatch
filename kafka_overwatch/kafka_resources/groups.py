@@ -122,7 +122,6 @@ def set_update_cluster_consumer_groups(
     """
     set_update_filter_cluster_consumer_groups(kafka_cluster)
     _tasks = len(kafka_cluster.groups)
-    completed: int = 0
     groups_jobs: dict = {
         _consumer_group_name: [_consumer_group, kafka_cluster]
         for _consumer_group_name, _consumer_group in kafka_cluster.groups.items()
@@ -146,36 +145,6 @@ def set_update_cluster_consumer_groups(
             kafka_cluster.name,
             "Consumer groups",
         )
-
-        # while _pending > 0:
-        #     if stop_flag.is_set():
-        #         for _future in futures_to_data:
-        #             _future.cancel()
-        #         executor.shutdown(wait=False, cancel_futures=True)
-        #         return
-        #     _, other = concurrent.futures.wait(futures_to_data, timeout=5)
-        #     _pending = len([_f for _f in other if not _f.done()])
-        #     KAFKA_LOG.info(
-        #         "Kafka cluster: %s | CGs Pending: %s" % (kafka_cluster.name, _pending)
-        #     )
-
-        # while completed < _tasks:
-        #     for _future in concurrent.futures.as_completed(futures_to_data):
-        #         if not kafka_cluster.keep_running or stop_flag.is_set():
-        #             executor.shutdown(wait=False, cancel_futures=True)
-        #             return
-        #         if _future.exception():
-        #             data = retry_kafka_describe_update_consumer_group_offsets(
-        #                 _future, futures_to_data, executor
-        #             )
-        #             print(f"Failure, retrying {data}")
-        #         else:
-        #             KAFKA_LOG.debug(_future.result())
-        #             completed += 1
-        #         futures_to_data.pop(_future)
-        #     else:
-        #         continue
-        #     break
 
 
 def describe_update_consumer_group_offsets(

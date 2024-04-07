@@ -85,7 +85,6 @@ class SchemaRegistry:
                 self.config.config.schema_registry_url,
                 **kwargs,
             )
-        return
 
     def backup(self):
         if not self.s3_backup_handler:
@@ -100,12 +99,13 @@ class SchemaRegistry:
                     f"{schemas_folder.name}/{schema_file_name}", "w"
                 ) as subject_version_fd:
                     subject_version_fd.write(_schema.schema_string)
-        with tarfile.open(f"{process_folder}/schemas.tar.gz", "w:gz") as tar:
+        with tarfile.open(f"{process_folder.name}/schemas.tar.gz", "w:gz") as tar:
             tar.add(schemas_folder.name, arcname=".")
-        self.s3_backup_handler.upload(
-            f"{process_folder.name}/schemas.tar.gz",
-            "schemas.tar.gz",
-            "application/gzip",
-        )
+        with open(f"{process_folder.name}/schemas.tar.gz", "rb") as gz_fd:
+            self.s3_backup_handler.upload(
+                body=gz_fd.read(),
+                file_name="schemas.tar.gz",
+                mime_type="application/gzip",
+            )
         schemas_folder.cleanup()
         process_folder.cleanup()

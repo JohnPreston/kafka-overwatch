@@ -20,7 +20,6 @@ def wait_between_intervals(time_to_wait: int, too_short_desc: str = None) -> Non
     if time_to_wait <= 0:
         if too_short_desc is not None:
             print(too_short_desc)
-        return
     else:
         for _ in range(1, time_to_wait):
             if stop_flag.is_set():

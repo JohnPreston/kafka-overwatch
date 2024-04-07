@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import concurrent.futures
+import os
+import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -14,7 +16,7 @@ if TYPE_CHECKING:
 
 import pickle
 import signal
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from compose_x_common.compose_x_common import set_else_none
 from prometheus_client import Gauge
@@ -47,7 +49,7 @@ def retrieve_from_subjects(schema_registry: SchemaRegistry, sr_client) -> None:
             schema_registry.subjects[subject_name] = _subject
     KAFKA_LOG.info(
         "%s - Started subjects/schemas update at %s"
-        % (schema_registry.name, datetime.utcnow().isoformat())
+        % (schema_registry.name, datetime.now(timezone.utc))
     )
     subject_jobs: list = [
         [_subject, sr_client] for _subject in schema_registry.subjects.values()
@@ -126,9 +128,73 @@ def init_schema_registry_prometheus_reporting(
     return subjects_count, schemas_count
 
 
-def import_subjects(
+def process_schemas(schema_registry: SchemaRegistry, sr_client) -> None:
+    """
+    Process all schemas in the schema registry.
+    If getting schemas from /schemas fails, fall back to /subjects
+    """
+    try:
+        retrieve_from_schemas(schema_registry, sr_client)
+    except Exception as error:
+        KAFKA_LOG.exception(error)
+        KAFKA_LOG.error(
+            f"{schema_registry.name} Failed to retrieve schemas via /schemas"
+        )
+        retrieve_from_subjects(schema_registry, sr_client)
+
+
+def set_prometheus_metrics(
+    subjects_count, schemas_count, schema_registry: SchemaRegistry
+):
+    try:
+        subjects_count.set(len(schema_registry.subjects))
+        schemas_count.set(len(schema_registry.schemas))
+    except Exception as error:
+        print(error)
+        KAFKA_LOG.error(
+            "Schema registry: %s | Unable to set prometheus metrics"
+            % (schema_registry.name,)
+        )
+
+
+def backup_schema_registry_subjects(schema_registry: SchemaRegistry) -> None:
+    """Attempts to back up all the subjects and their associated schemas to S3."""
+    try:
+        if schema_registry.s3_backup_handler:
+            schema_registry.backup()
+    except Exception as error:
+        KAFKA_LOG.exception(error)
+        KAFKA_LOG.error(
+            f"Schema Registry: {schema_registry.name} | Failed to backup to S3"
+        )
+
+
+def write_schema_registry_mmap(schema_registry: SchemaRegistry) -> None:
+    """Writes the schema registry to a mmap file."""
+    try:
+        with open(schema_registry.mmap_file, "wb") as bin_fd:
+            bin_fd.write(pickle.dumps(schema_registry))
+            KAFKA_LOG.info(
+                "%s Wrote schema registry to %s"
+                % (schema_registry.name, schema_registry.mmap_file)
+            )
+    except Exception as error:
+        KAFKA_LOG.exception(error)
+        KAFKA_LOG.error(
+            "Schema Registry: %s | Failed to write mmap file to %s"
+            % (schema_registry.name, schema_registry.mmap_file)
+        )
+
+
+def process_schema_registry(
     schema_registry: SchemaRegistry, runtime_key, overwatch_config: OverwatchConfig
 ) -> None:
+    """Process function for the schema registry. Responsible for
+
+    * retrieving all the schemas & subjects
+    * backup the subjects & schemas if configured.
+
+    """
     signal.signal(signal.SIGINT, handle_signals)
     signal.signal(signal.SIGTERM, handle_signals)
     subjects_count, schemas_count = init_schema_registry_prometheus_reporting(
@@ -138,54 +204,25 @@ def import_subjects(
     while FOREVER:
         if stop_flag.is_set():
             break
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         next_scan = now + timedelta(
             seconds=schema_registry.config.schema_registry_scan_interval
         )
         try:
-            retrieve_from_schemas(schema_registry, sr_client)
+            process_schemas(schema_registry, sr_client)
+            set_prometheus_metrics(subjects_count, schemas_count, schema_registry)
+            backup_schema_registry_subjects(schema_registry)
+            write_schema_registry_mmap(schema_registry)
         except Exception as error:
             KAFKA_LOG.exception(error)
             KAFKA_LOG.error(
-                "{} Failed to retrieve schemas via /schemas".format(
-                    schema_registry.name
-                )
-            )
-            retrieve_from_subjects(schema_registry, sr_client)
-        try:
-            subjects_count.set(len(schema_registry.subjects))
-            schemas_count.set(len(schema_registry.schemas))
-        except Exception as error:
-            print(error)
-            KAFKA_LOG.error(
-                "Schema registry: %s | Unable to set prometheus metrics"
+                "Schema registry: %s | Failed to process successfully."
                 % (schema_registry.name,)
             )
+            schema_registry.temp_bin_dir.cleanup()
+            return
         then = datetime.utcnow()
-        try:
-            if schema_registry.s3_backup_handler:
-                schema_registry.backup()
-        except Exception as error:
-            KAFKA_LOG.exception(error)
-            KAFKA_LOG.error(
-                "Schema Registry: {} | Failed to backup to S3".format(
-                    schema_registry.name
-                )
-            )
         delta = int((next_scan - then).total_seconds())
-        try:
-            with open(schema_registry.mmap_file, "wb") as bin_fd:
-                bin_fd.write(pickle.dumps(schema_registry))
-                KAFKA_LOG.info(
-                    "%s Wrote schema registry to %s"
-                    % (schema_registry.name, schema_registry.mmap_file)
-                )
-        except Exception as error:
-            KAFKA_LOG.exception(error)
-            KAFKA_LOG.error(
-                "Schema Registry: %s | Failed to write mmap file to %s"
-                % (schema_registry.name, schema_registry.mmap_file)
-            )
         if delta > 0:
             KAFKA_LOG.info("%s - Waiting %d seconds" % (schema_registry.name, delta))
             wait_between_intervals(

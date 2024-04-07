@@ -15,7 +15,7 @@ from kafka_overwatch.config.logging import KAFKA_LOG
 from kafka_overwatch.overwatch_resources.clusters import KafkaCluster
 from kafka_overwatch.processing import handle_signals, stop_flag
 from kafka_overwatch.processing.clusters import process_cluster
-from kafka_overwatch.processing.schema_registries import import_subjects
+from kafka_overwatch.processing.schema_registries import process_schema_registry
 
 
 class KafkaOverwatchService:
@@ -77,7 +77,7 @@ class KafkaOverwatchService:
             if sr_jobs:
                 futures_to_data.update(
                     {
-                        executor.submit(import_subjects, *sr_job): sr_job
+                        executor.submit(process_schema_registry, *sr_job): sr_job
                         for sr_job in sr_jobs
                     }
                 )

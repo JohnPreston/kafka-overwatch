@@ -201,31 +201,7 @@ def describe_update_topics(kafka_cluster: KafkaCluster, desc_topics: dict) -> No
             kafka_cluster.name,
             "Topics",
         )
-        # while _pending > 0:
-        #     if stop_flag.is_set():
-        #         for _future in futures_to_data:
-        #             _future.cancel()
-        #         executor.shutdown(wait=False, cancel_futures=True)
-        #         return
-        #     _, other = concurrent.futures.wait(futures_to_data, timeout=5)
-        #     _pending = len([_f for _f in other if not _f.done()])
-        #     KAFKA_LOG.info(
-        #         "Kafka cluster: %s | Topics Pending: %s"
-        #         % (kafka_cluster.name, _pending)
-        #     )
 
-        # while completed < _tasks:
-        #     for _future in concurrent.futures.as_completed(futures_to_data):
-        #         if not kafka_cluster.keep_running or stop_flag.is_set():
-        #             executor.shutdown(wait=False, cancel_futures=True)
-        #             break
-        #         if _future.exception():
-        #             data = retry_kafka(_future, futures_to_data, executor)
-        #             print(f"Failure, retrying {data}")
-        #         else:
-        #             KAFKA_LOG.debug(_future.result())
-        #             completed += 1
-        #         futures_to_data.pop(_future)
     update_set_topic_config(kafka_cluster, topics_configs_resources)
 
 

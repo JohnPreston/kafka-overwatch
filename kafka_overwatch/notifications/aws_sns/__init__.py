@@ -67,9 +67,9 @@ class SnsChannel:
 
     def import_usage_report_jinja2_templates(self) -> None:
         if self.definition.template and self.definition.template.email:
-            self._usage_report_templates_definitions[
-                "email"
-            ] = self.definition.template.email
+            self._usage_report_templates_definitions["email"] = (
+                self.definition.template.email
+            )
         for (
             message_type,
             template_path,

@@ -3,23 +3,22 @@
 
 from __future__ import annotations
 
+import tarfile
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from kafka_overwatch.overwatch_resources.clusters import KafkaCluster
-    from kafka_overwatch.config.config import OverwatchConfig
+    from .subject import Subject
+    from .schema import Schema
 
 from tempfile import TemporaryDirectory
 
 from cryptography.fernet import Fernet
 from kafka_schema_registry_admin import SchemaRegistry as SchemaRegistryClient
-from prometheus_client import Gauge
 
-from kafka_overwatch.processing import ensure_prometheus_multiproc
+from kafka_overwatch.aws_helpers.s3 import S3Handler
 from kafka_overwatch.specs.config import ConfluentSchemaRegistry
 from kafka_overwatch.specs.config import SchemaRegistry as SchemaRegistryConfig
-
-from .subject import Schema, Subject, refresh_subject_metadata
 
 
 class BasicAuthCreds:
@@ -63,6 +62,11 @@ class SchemaRegistry:
         """Kafka clusters this schema registry is linked to"""
         self.kafka_clusters: dict[str, KafkaCluster] = {}
         self._config = registry_config
+        self.s3_backup_handler: S3Handler | None = None
+        if self.config.backup_config and self.config.backup_config.enabled:
+            self.s3_backup_handler = S3Handler(self.config.backup_config.S3)
+
+        self.supported_types = ["JSON", "PROTOBUF", "AVRO"]
 
     @property
     def config(self) -> SchemaRegistryConfig:
@@ -82,3 +86,26 @@ class SchemaRegistry:
                 **kwargs,
             )
         return
+
+    def backup(self):
+        if not self.s3_backup_handler:
+            return
+        process_folder = TemporaryDirectory()
+        schemas_folder: TemporaryDirectory = TemporaryDirectory(dir=process_folder.name)
+        for _subject in self.subjects.values():
+            for version in _subject.versions:
+                _schema: Schema = _subject.versions[version]
+                schema_file_name = f"{_subject.name}::{version}::{_schema.schema_type}::{_schema.schema_id}.txt"
+                with open(
+                    f"{schemas_folder.name}/{schema_file_name}", "w"
+                ) as subject_version_fd:
+                    subject_version_fd.write(_schema.schema_string)
+        with tarfile.open(f"{process_folder}/schemas.tar.gz", "w:gz") as tar:
+            tar.add(schemas_folder.name, arcname=".")
+        self.s3_backup_handler.upload(
+            f"{process_folder.name}/schemas.tar.gz",
+            "schemas.tar.gz",
+            "application/gzip",
+        )
+        schemas_folder.cleanup()
+        process_folder.cleanup()

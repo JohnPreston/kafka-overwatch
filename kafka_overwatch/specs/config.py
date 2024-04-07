@@ -403,6 +403,7 @@ class BackupConfig:
     """
     Turn backup on
     """
+    backup_interval_seconds: int | None = None
     S3: S3Output | None = None
 
 

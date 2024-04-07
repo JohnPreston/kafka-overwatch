@@ -670,6 +670,10 @@
               "type": "boolean",
               "description": "Turn backup on"
             },
+            "backup_interval_seconds": {
+              "type": "integer",
+              "minimum": 60
+            },
             "S3": {
               "$ref": "#/definitions/S3Output"
             }

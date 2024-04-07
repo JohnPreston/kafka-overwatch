@@ -102,6 +102,27 @@ take as much time to process.
     all files in said directory when the process finishes.
 
 
+Backup
+========
+
+Schema Registry is pretty simple to deploy yourself, and when doing so, you will have access to the ``_schemas`` (default name)
+topic to see what's going on with your schemas evolution, and potentially extract the data from that topic, to another.
+
+However, when using a manged service, you probably won't have access to that topic and you will need to rely on the API
+to have any form of backup.
+
+Using the Schema Registry API, all the schemas are pulled. For backup, their definition is stored in-memory as to allow
+creating a file that could be used to deploy the schema again.
+
+Each subject information needs to be retained as to allow restoring the subject and its version properly to Schema Registry.
+Therefore, the files are created with the below namin
+
+``f"{subject_name}::{subject_version}::{schema_type}::{schema_id}.txt"``
+
+The files are written to disk in a `tempfile.TemporaryDirectory`_ and a tar.gz file is created from that folder.
+The tar.gz file is then uploaded to AWS S3, as per the configuration defined in ``backup_config``.
+
+
 .. _mmap: https://docs.python.org/3/library/mmap.html
 .. _tempfile.TemporaryDirectory: https://docs.python.org/3/library/tempfile.html#tempfile.TemporaryDirectory
 .. _Schema Registry & Naming strategy: https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html#subject-name-strategy

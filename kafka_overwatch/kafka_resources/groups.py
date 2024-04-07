@@ -31,9 +31,9 @@ def get_consumer_groups_desc(
         groups_desc: dict[str, ConsumerGroupDescription] = {}
 
     groups_to_describe: list[str] = [_group for _group in groups_list]
-    groups_desc_r: dict[
-        str, concurrent.futures.Future
-    ] = kafka_cluster.get_admin_client().describe_consumer_groups(groups_to_describe)
+    groups_desc_r: dict[str, concurrent.futures.Future] = (
+        kafka_cluster.get_admin_client().describe_consumer_groups(groups_to_describe)
+    )
 
     to_retry: list[str] = []
 

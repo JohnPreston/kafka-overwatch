@@ -7,23 +7,26 @@ import concurrent.futures
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from kafka_overwatch.overwatch_resources.schema_registry import SchemaRegistry
+    from kafka_overwatch.overwatch_resources.schema_registry import (
+        SchemaRegistry,
+    )
     from kafka_overwatch.config.config import OverwatchConfig
 
 import pickle
 import signal
 from datetime import datetime, timedelta
 
+from compose_x_common.compose_x_common import set_else_none
 from prometheus_client import Gauge
 
 from kafka_overwatch.common import waiting_on_futures
 from kafka_overwatch.config.logging import KAFKA_LOG
 from kafka_overwatch.config.threads_settings import NUM_THREADS
-from kafka_overwatch.overwatch_resources.schema_registry import (
+from kafka_overwatch.overwatch_resources.schema_registry.schema import (
     Schema,
-    Subject,
     refresh_subject_metadata,
 )
+from kafka_overwatch.overwatch_resources.schema_registry.subject import Subject
 from kafka_overwatch.processing import ensure_prometheus_multiproc
 
 from . import FOREVER, handle_signals, stop_flag, wait_between_intervals
@@ -71,30 +74,44 @@ def retrieve_from_subjects(schema_registry: SchemaRegistry, sr_client) -> None:
         )
 
 
-def retrieve_from_schemas(schema_registry: SchemaRegistry, schemas: list[dict]) -> None:
+def retrieve_from_schemas(schema_registry: SchemaRegistry, sr_client) -> None:
     """
     Fastest way, used if /schemas worked
     """
+    schemas_r = sr_client.get_all_schemas()
+    if not (200 <= schemas_r.status_code <= 299):
+        raise LookupError(f"Error retrieving schemas: {schemas_r.text}")
+    schemas = schemas_r.json()
     KAFKA_LOG.info(f"Schema Registry: {schema_registry.name} | Retrieving all schemas")
     for _schema in schemas:
-        schema_subject: str = _schema["subject"]
-        schema_id: int = _schema["id"]
-        schema_version: int = _schema["version"]
-        _schema_content: str = _schema["schema"]
+        try:
+            schema_subject: str = _schema["subject"]
+            schema_id: int = _schema["id"]
+            schema_version: int = _schema["version"]
+            _schema_content: str = _schema["schema"]
+            _schema_type: str | None = set_else_none("schemaType", _schema, "AVRO")
 
-        if schema_id not in schema_registry.schemas:
-            schema = Schema(schema_id, schema_registry)
-            schema_registry.schemas[schema_id] = schema
-        else:
-            schema = schema_registry.schemas[schema_id]
+            if schema_id not in schema_registry.schemas:
+                schema = Schema(
+                    schema_id, _schema_content, schema_registry, _schema_type
+                )
+                schema_registry.schemas[schema_id] = schema
+            else:
+                schema = schema_registry.schemas[schema_id]
 
-        if schema_subject not in schema_registry.subjects:
-            subject = Subject(schema_subject, schema_registry)
-            schema_registry.subjects[schema_subject] = subject
-        else:
-            subject = schema_registry.subjects[schema_subject]
-        if schema_version not in subject.versions:
-            subject.versions[schema_version] = schema
+            if schema_subject not in schema_registry.subjects:
+                subject = Subject(schema_subject, schema_registry)
+                schema_registry.subjects[schema_subject] = subject
+            else:
+                subject = schema_registry.subjects[schema_subject]
+            if schema_version not in subject.versions:
+                subject.versions[schema_version] = schema
+        except Exception as error:
+            KAFKA_LOG.exception(error)
+            KAFKA_LOG.error(
+                "Schema registry: %s | Error retrieving schema %s"
+                % (schema_registry.name, _schema)
+            )
 
 
 def init_schema_registry_prometheus_reporting(
@@ -126,9 +143,7 @@ def import_subjects(
             seconds=schema_registry.config.schema_registry_scan_interval
         )
         try:
-            schemas_r = sr_client.get_all_schemas()
-            if 200 <= schemas_r.status_code <= 299:
-                retrieve_from_schemas(schema_registry, schemas_r.json())
+            retrieve_from_schemas(schema_registry, sr_client)
         except Exception as error:
             KAFKA_LOG.exception(error)
             KAFKA_LOG.error(
@@ -147,6 +162,16 @@ def import_subjects(
                 % (schema_registry.name,)
             )
         then = datetime.utcnow()
+        try:
+            if schema_registry.s3_backup_handler:
+                schema_registry.backup()
+        except Exception as error:
+            KAFKA_LOG.exception(error)
+            KAFKA_LOG.error(
+                "Schema Registry: {} | Failed to backup to S3".format(
+                    schema_registry.name
+                )
+            )
         delta = int((next_scan - then).total_seconds())
         try:
             with open(schema_registry.mmap_file, "wb") as bin_fd:

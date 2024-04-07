@@ -117,6 +117,48 @@
               }
             }
           }
+        },
+        "schema_registry": {
+          "$ref": "#/definitions/schema_registry_report"
+        }
+      }
+    },
+    "schema_registry_report": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "x-": {}
+      },
+      "properties": {
+        "subjects_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "schemas_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "schemas_estimates": {
+          "$ref": "#/definitions/schemas_waste_estimates"
+        }
+      }
+    },
+    "schemas_waste_estimates": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "x-": {}
+      },
+      "properties": {
+        "detected_unused": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "detected_unused_count": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },

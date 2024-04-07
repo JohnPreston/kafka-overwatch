@@ -5,24 +5,21 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from retry import retry
-
 if TYPE_CHECKING:
     from confluent_kafka.admin import TopicDescription
     from kafka_overwatch.overwatch_resources.clusters import KafkaCluster
 
 import concurrent.futures
 import re
-import threading
 from datetime import datetime as dt
 
 from confluent_kafka import TopicCollection, TopicPartition
 from confluent_kafka.admin import AclOperation, ConfigResource, ResourceType
-from confluent_kafka.error import KafkaError, KafkaException
+from confluent_kafka.error import KafkaException
 from retry.api import retry, retry_call
 
+from kafka_overwatch.common import waiting_on_futures
 from kafka_overwatch.config.logging import KAFKA_LOG
-from kafka_overwatch.config.threads_settings import NUM_THREADS
 from kafka_overwatch.kafka_resources import wait_for_result
 from kafka_overwatch.overwatch_resources.topics import Partition, Topic
 
@@ -183,7 +180,6 @@ def describe_update_topics(kafka_cluster: KafkaCluster, desc_topics: dict) -> No
     """
     topic_jobs, topics_configs_resources = define_topic_jobs(kafka_cluster, desc_topics)
     _tasks = len(topic_jobs)
-    completed: int = 0
     with concurrent.futures.ThreadPoolExecutor(
         max_workers=kafka_cluster.cluster_brokers_count
     ) as executor:
@@ -191,19 +187,20 @@ def describe_update_topics(kafka_cluster: KafkaCluster, desc_topics: dict) -> No
             executor.submit(init_set_partitions, *job_params): job_params
             for job_params in topic_jobs.values()
         }
+        _pending: int = len(futures_to_data)
+        KAFKA_LOG.info(
+            "Kafka cluster: {} | Topics to scan: {}".format(
+                kafka_cluster.name, _pending
+            )
+        )
+        waiting_on_futures(
+            executor,
+            futures_to_data,
+            "Kafka Cluster",
+            kafka_cluster.name,
+            "Topics",
+        )
 
-        while completed < _tasks:
-            for _future in concurrent.futures.as_completed(futures_to_data):
-                if not kafka_cluster.keep_running or kafka_cluster.stop_flag.is_set():
-                    executor.shutdown(wait=False, cancel_futures=True)
-                    break
-                if _future.exception():
-                    data = retry_kafka(_future, futures_to_data, executor)
-                    print(f"Failure, retrying {data}")
-                else:
-                    KAFKA_LOG.debug(_future.result())
-                    completed += 1
-                futures_to_data.pop(_future)
     update_set_topic_config(kafka_cluster, topics_configs_resources)
 
 

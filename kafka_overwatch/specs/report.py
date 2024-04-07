@@ -49,6 +49,12 @@ class Statistics:
 
 
 @dataclass
+class SchemasWasteEstimates:
+    detected_unused: list[str] | None = None
+    detected_unused_count: int | None = None
+
+
+@dataclass
 class TopicWasteCategory:
     topics: dict[str, int]
     topic_partitions_sum: int
@@ -108,6 +114,13 @@ class EstimatedWaste:
 
 
 @dataclass
+class SchemaRegistryReport:
+    subjects_count: int | None = None
+    schemas_count: int | None = None
+    schemas_estimates: SchemasWasteEstimates | None = None
+
+
+@dataclass
 class ClusterReport:
     cluster_name: str
     metadata: Metadata
@@ -117,6 +130,7 @@ class ClusterReport:
     """
     statistics: Statistics | None = None
     estimated_waste: EstimatedWaste | None = None
+    schema_registry: SchemaRegistryReport | None = None
 
 
 @dataclass

@@ -10,10 +10,12 @@ if TYPE_CHECKING:
 
 import concurrent.futures
 import signal
-from multiprocessing import Event
 
 from kafka_overwatch.config.logging import KAFKA_LOG
+from kafka_overwatch.overwatch_resources.clusters import KafkaCluster
+from kafka_overwatch.processing import handle_signals, stop_flag
 from kafka_overwatch.processing.clusters import process_cluster
+from kafka_overwatch.processing.schema_registries import process_schema_registry
 
 
 class KafkaOverwatchService:
@@ -29,9 +31,9 @@ class KafkaOverwatchService:
 
     def __init__(self, config: OverwatchConfig) -> None:
         self._config = config
-        self.stop_event = Event()
-        signal.signal(signal.SIGINT, self.exit_gracefully)
-        signal.signal(signal.SIGTERM, self.exit_gracefully)
+        self.kafka_clusters: dict[str, KafkaCluster] = {}
+        signal.signal(signal.SIGINT, handle_signals)
+        signal.signal(signal.SIGTERM, handle_signals)
 
     @property
     def config(self) -> OverwatchConfig:
@@ -50,46 +52,46 @@ class KafkaOverwatchService:
         KAFKA_LOG.info("Starting Kafka Overwatch")
         self.init_system()
         clusters_jobs = []
+        self.kafka_clusters.update(
+            {
+                name: KafkaCluster(name, config, self.config)
+                for name, config in self.config.input_config.clusters.items()
+            }
+        )
+        sr_jobs: list = [
+            [_sr, self.config.runtime_key, self.config]
+            for _sr in self.config.schema_registries.values()
+        ]
         for (
             cluster_name,
-            cluster_config,
-        ) in self.config.input_config.clusters.items():
-            clusters_jobs.append([cluster_name, cluster_config, self.config])
+            cluster,
+        ) in self.kafka_clusters.items():
+            clusters_jobs.append([cluster, self.config])
+        self.multi_clusters_processing(clusters_jobs, sr_jobs)
 
-        if len(clusters_jobs) > 1:
-            self.multi_clusters_processing(clusters_jobs)
-        else:
-            cluster_name = list(self.config.input_config.clusters.keys())[0]
-            cluster_config = self.config.input_config.clusters[cluster_name]
-            try:
-                process_cluster(cluster_name, cluster_config, self.config)
-            except Exception as error:
-                KAFKA_LOG.error(f"Error processing cluster {cluster_name} - {error}")
-                raise
-
-    def multi_clusters_processing(self, clusters_jobs):
+    def multi_clusters_processing(self, clusters_jobs: list, sr_jobs: list):
         with concurrent.futures.ProcessPoolExecutor(
-            max_workers=len(self.config.input_config.clusters)
+            max_workers=(len(clusters_jobs) + len(sr_jobs))
         ) as executor:
-            futures_to_data: dict[concurrent.futures.Future, list] = {
-                executor.submit(process_cluster, *cluster_job): cluster_job
-                for cluster_job in clusters_jobs
-            }
+            futures_to_data: dict[concurrent.futures.Future, list] = {}
+            if sr_jobs:
+                futures_to_data.update(
+                    {
+                        executor.submit(process_schema_registry, *sr_job): sr_job
+                        for sr_job in sr_jobs
+                    }
+                )
+            futures_to_data.update(
+                {
+                    executor.submit(process_cluster, *cluster_job): cluster_job
+                    for cluster_job in clusters_jobs
+                }
+            )
             try:
-                while not self.stop_event.is_set():
+                while not stop_flag.is_set():
                     concurrent.futures.wait(futures_to_data, timeout=10)
             except KeyboardInterrupt:
                 for _future in futures_to_data:
                     _future.cancel()
                 executor.shutdown(wait=True, cancel_futures=True)
         return
-
-    def exit_gracefully(self, pid, frame):
-        """
-        Upon SIGNAL, stop the processes of each cluster.
-        """
-
-        KAFKA_LOG.warning(
-            f"main - Exiting gracefully due to signal/interruption - {pid}"
-        )
-        self.stop_event.set()

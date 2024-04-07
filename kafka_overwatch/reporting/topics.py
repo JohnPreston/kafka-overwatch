@@ -76,9 +76,9 @@ def process_cluster_topic_df(topics_df: pd.DataFrame) -> dict:
             "description": "Topics with no messages, no active consumer group, and more than one partition",
         },
     )
-    topic_categories[
-        "no_messages_topics_with_multiple_partitions"
-    ] = no_messages_topics_with_multiple_partitions_category
+    topic_categories["no_messages_topics_with_multiple_partitions"] = (
+        no_messages_topics_with_multiple_partitions_category
+    )
 
     no_cgs_and_no_new_messages = topics_df[
         (topics_df["total_messages"] > 0)

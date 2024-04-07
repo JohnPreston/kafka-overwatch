@@ -10,12 +10,9 @@ if TYPE_CHECKING:
     from prometheus_client import Gauge
     from kafka_overwatch.config.config import OverwatchConfig
 
-import os
 import signal
-import time
 from datetime import datetime as dt
 from datetime import timedelta as td
-from threading import Event
 
 from kafka_overwatch.config.logging import KAFKA_LOG
 from kafka_overwatch.kafka_resources.groups import (
@@ -29,19 +26,7 @@ from kafka_overwatch.overwatch_resources.clusters import (
     generate_cluster_topics_pd_dataframe,
 )
 
-FOREVER = 42
-stop_flag = Event()
-
-
-def ensure_prometheus_multiproc(prometheus_dir_path: str):
-    """
-    Just in case the env_var had not propagated among processes,
-    setting in child env var.
-    """
-    if not os.environ.get("PROMETHEUS_MULTIPROC_DIR"):
-        os.environ["PROMETHEUS_MULTIPROC_DIR"] = prometheus_dir_path
-    if not os.environ.get("prometheus_multiproc_dir"):
-        os.environ["prometheus_multiproc_dir"] = prometheus_dir_path
+from . import FOREVER, handle_signals, stop_flag, wait_between_intervals
 
 
 def measure_consumer_group_lags(
@@ -77,77 +62,74 @@ def generate_cluster_report(
         )
 
 
-def handle_signals(pid, frame):
-    print("Cluster processing received signal to stop", pid, frame)
-    global stop_flag
-    stop_flag.set()
-
-
-def process_cluster(
-    cluster_name: str, cluster_config, overwatch_config: OverwatchConfig
-):
+def process_cluster(kafka_cluster: KafkaCluster, overwatch_config: OverwatchConfig):
     """
     Initialize the Kafka cluster monitoring/evaluation loop.
     Creates the cluster, which creates the Kafka clients.
     """
     signal.signal(signal.SIGINT, handle_signals)
     signal.signal(signal.SIGTERM, handle_signals)
-    ensure_prometheus_multiproc(overwatch_config.prometheus_registry_dir.name)
-    kafka_cluster = KafkaCluster(
-        cluster_name, cluster_config, overwatch_config=overwatch_config
-    )
+    kafka_cluster.init_cluster_prometheus_reporting(overwatch_config)
     kafka_cluster.set_reporting_exporters()
     kafka_cluster.set_cluster_connections()
     consumer_group_lag_gauge = overwatch_config.prometheus_collectors[
         "consumer_group_lag"
     ]
-
     while FOREVER:
-        kafka_cluster.check_replace_kafka_clients()
-        kafka_cluster.set_cluster_properties()
-        print(
-            "PROCESSING LOOP - CLIENTS??",
-            hex(id(kafka_cluster._admin_client)),
-            hex(id(kafka_cluster._consumer_client)),
-        )
-
-        processing_start = dt.utcnow()
-        if not stop_flag.is_set():
-            process_cluster_resources(kafka_cluster)
-        else:
-            break
-        topics_df = generate_cluster_topics_pd_dataframe(kafka_cluster)
-        groups_df = generate_cluster_consumer_groups_pd_dataframe(kafka_cluster)
-        kafka_cluster.cluster_topics_count.set(len(topics_df["name"].values.tolist()))
-        kafka_cluster.cluster_partitions_count.set(
-            sum(topics_df["partitions"].values.tolist())
-        )
-        kafka_cluster.cluster_consumer_groups_count.set(len(kafka_cluster.groups))
-        if (
-            kafka_cluster.config.topics_backup_config
-            and kafka_cluster.config.topics_backup_config.enabled
-        ):
-            kafka_cluster.render_restore_files()
-        elapsed_time = int((dt.utcnow() - processing_start).total_seconds())
-        KAFKA_LOG.info(f"{kafka_cluster.name} - {elapsed_time}s processing time.")
-        KAFKA_LOG.info(f"{kafka_cluster.name} - Cluster topics stats")
-        print(topics_df.describe())
-        print(groups_df.describe())
-        measure_consumer_group_lags(kafka_cluster, consumer_group_lag_gauge)
-        generate_cluster_report(kafka_cluster, topics_df, groups_df)
-        time_to_wait = int(
-            kafka_cluster.config.cluster_scan_interval_in_seconds - elapsed_time
-        )
-        if time_to_wait <= 0:
+        try:
+            kafka_cluster.check_replace_kafka_clients()
+            kafka_cluster.set_cluster_properties()
             print(
-                f"{kafka_cluster.name} - interval set to {kafka_cluster.config.cluster_scan_interval_in_seconds}"
-                f", however it takes {elapsed_time}s to complete the scan. Consider changing scan interval"
+                "PROCESSING LOOP - CLIENTS??",
+                hex(id(kafka_cluster._admin_client)),
+                hex(id(kafka_cluster._consumer_client)),
             )
-        else:
-            for _ in range(1, time_to_wait):
-                if stop_flag.is_set():
-                    break
-                time.sleep(1)
+
+            processing_start = dt.utcnow()
+            if not stop_flag.is_set():
+                process_cluster_resources(kafka_cluster)
+            else:
+                break
+            topics_df = generate_cluster_topics_pd_dataframe(kafka_cluster)
+            groups_df = generate_cluster_consumer_groups_pd_dataframe(kafka_cluster)
+            kafka_cluster.cluster_topics_count.set(
+                len(topics_df["name"].values.tolist())
+            )
+            kafka_cluster.cluster_partitions_count.set(
+                sum(topics_df["partitions"].values.tolist())
+            )
+            kafka_cluster.cluster_consumer_groups_count.set(len(kafka_cluster.groups))
+            if (
+                kafka_cluster.config.topics_backup_config
+                and kafka_cluster.config.topics_backup_config.enabled
+            ):
+                kafka_cluster.render_restore_files()
+            elapsed_time = int((dt.utcnow() - processing_start).total_seconds())
+            KAFKA_LOG.info(f"{kafka_cluster.name} - {elapsed_time}s processing time.")
+            KAFKA_LOG.info(f"{kafka_cluster.name} - Cluster topics stats")
+            print(topics_df.describe())
+            print(groups_df.describe())
+            measure_consumer_group_lags(kafka_cluster, consumer_group_lag_gauge)
+            generate_cluster_report(kafka_cluster, topics_df, groups_df)
+            time_to_wait = int(
+                kafka_cluster.config.cluster_scan_interval_in_seconds - elapsed_time
+            )
+            wait_between_intervals(
+                time_to_wait,
+                (
+                    f"{kafka_cluster.name} - interval set to {kafka_cluster.config.cluster_scan_interval_in_seconds}"
+                    f", however it takes {elapsed_time}s to complete the scan. Consider changing scan interval"
+                ),
+            )
+        except Exception as e:
+            KAFKA_LOG.exception(e)
+            KAFKA_LOG.error(f"{kafka_cluster.name} - {e}")
+            try:
+                kafka_cluster.set_cluster_connections()
+            except Exception as e:
+                KAFKA_LOG.exception(e)
+                KAFKA_LOG.error(f"{kafka_cluster.name} - {e}")
+                return
     return
 
 

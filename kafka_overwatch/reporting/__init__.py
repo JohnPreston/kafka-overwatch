@@ -13,7 +13,6 @@ if TYPE_CHECKING:
     from kafka_overwatch.overwatch_resources.clusters import KafkaCluster
 
 from kafka_overwatch.specs.config import GovernanceReportingConfig
-from kafka_overwatch.specs.config import NamingConvention as NamingConventionConfig
 from kafka_overwatch.specs.report import ClusterReport, EstimatedWaste
 from kafka_overwatch.specs.report import Governance as GovReport
 from kafka_overwatch.specs.report import (
@@ -24,6 +23,7 @@ from kafka_overwatch.specs.report import (
 
 from .governance.consumer_groups_naming_convention import review_topic_naming
 from .governance.topic_naming_convention import review_topic_naming
+from .schema_registry import get_schema_registry_report
 from .topics import process_cluster_topic_df
 
 
@@ -124,6 +124,7 @@ def get_cluster_usage(
         statistics=topics_stats,
         estimated_waste=topics_waste_estimate,
         governance=governance_report,
+        schema_registry=get_schema_registry_report(topics_df, kafka_cluster),
     )
     print(f"{kafka_cluster.name} - statistics")
     return cluster

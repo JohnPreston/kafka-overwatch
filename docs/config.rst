@@ -9,6 +9,8 @@
 Input Configuration
 =======================
 
+The input configuration is validated against JSON schema to perform early validation of the input configuration.
+
 JSON Schema
 =============
 

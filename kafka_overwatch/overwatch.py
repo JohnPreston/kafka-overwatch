@@ -10,7 +10,6 @@ if TYPE_CHECKING:
 
 import concurrent.futures
 import signal
-from multiprocessing import Event
 
 from kafka_overwatch.config.logging import KAFKA_LOG
 from kafka_overwatch.overwatch_resources.clusters import KafkaCluster
@@ -60,7 +59,7 @@ class KafkaOverwatchService:
             }
         )
         sr_jobs: list = [
-            [_sr, self.config.runtime_key]
+            [_sr, self.config.runtime_key, self.config]
             for _sr in self.config.schema_registries.values()
         ]
         for (

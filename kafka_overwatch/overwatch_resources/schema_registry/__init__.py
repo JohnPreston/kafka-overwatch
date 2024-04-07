@@ -11,10 +11,11 @@ if TYPE_CHECKING:
 
 from tempfile import TemporaryDirectory
 
-import httpx
 from cryptography.fernet import Fernet
 from kafka_schema_registry_admin import SchemaRegistry as SchemaRegistryClient
+from prometheus_client import Gauge
 
+from kafka_overwatch.processing import ensure_prometheus_multiproc
 from kafka_overwatch.specs.config import ConfluentSchemaRegistry
 from kafka_overwatch.specs.config import SchemaRegistry as SchemaRegistryConfig
 

@@ -10,7 +10,6 @@ if TYPE_CHECKING:
     from prometheus_client import Gauge
     from kafka_overwatch.config.config import OverwatchConfig
 
-import os
 import signal
 from datetime import datetime as dt
 from datetime import timedelta as td
@@ -27,18 +26,13 @@ from kafka_overwatch.overwatch_resources.clusters import (
     generate_cluster_topics_pd_dataframe,
 )
 
-from . import FOREVER, handle_signals, stop_flag, wait_between_intervals
-
-
-def ensure_prometheus_multiproc(prometheus_dir_path: str):
-    """
-    Just in case the env_var had not propagated among processes,
-    setting in child env var.
-    """
-    if not os.environ.get("PROMETHEUS_MULTIPROC_DIR"):
-        os.environ["PROMETHEUS_MULTIPROC_DIR"] = prometheus_dir_path
-    if not os.environ.get("prometheus_multiproc_dir"):
-        os.environ["prometheus_multiproc_dir"] = prometheus_dir_path
+from . import (
+    FOREVER,
+    ensure_prometheus_multiproc,
+    handle_signals,
+    stop_flag,
+    wait_between_intervals,
+)
 
 
 def measure_consumer_group_lags(
@@ -83,8 +77,7 @@ def process_cluster(
     """
     signal.signal(signal.SIGINT, handle_signals)
     signal.signal(signal.SIGTERM, handle_signals)
-    kafka_cluster.init_cluster_processing(overwatch_config)
-    ensure_prometheus_multiproc(overwatch_config.prometheus_registry_dir.name)
+    kafka_cluster.init_cluster_prometheus_reporting(overwatch_config)
     kafka_cluster.set_reporting_exporters()
     kafka_cluster.set_cluster_connections()
     consumer_group_lag_gauge = overwatch_config.prometheus_collectors[
@@ -153,4 +146,10 @@ def process_cluster_resources(kafka_cluster: KafkaCluster):
     if not stop_flag.is_set():
         cluster_sr = kafka_cluster.get_schema_registry()
         if cluster_sr:
-            print(len(cluster_sr.subjects), len(cluster_sr.schemas))
+            KAFKA_LOG.info(
+                "Kafka cluster: %s | Successfully retrieved Schema Registry %s metadata"
+                % (
+                    kafka_cluster.name,
+                    cluster_sr.name,
+                )
+            )

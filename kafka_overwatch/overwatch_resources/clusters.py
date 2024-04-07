@@ -35,6 +35,7 @@ from kafka_overwatch.config.logging import KAFKA_LOG
 from kafka_overwatch.kafka_resources import set_admin_client, set_consumer_client
 from kafka_overwatch.kafka_resources.topics import get_filtered_topics_list
 from kafka_overwatch.overwatch_resources.schema_registry import SchemaRegistry
+from kafka_overwatch.processing import ensure_prometheus_multiproc
 from kafka_overwatch.specs.config import (
     ClusterConfiguration,
     ClusterTopicBackupConfig,
@@ -82,7 +83,8 @@ class KafkaCluster:
                 self.config.cluster_config.schema_registry
             ].mmap_file
 
-    def init_cluster_processing(self, overwatch_config):
+    def init_cluster_prometheus_reporting(self, overwatch_config):
+        ensure_prometheus_multiproc(overwatch_config.prometheus_registry_dir.name)
         cluster_partitions_count: Gauge = self.prometheus_collectors[
             "cluster_partitions_count"
         ]

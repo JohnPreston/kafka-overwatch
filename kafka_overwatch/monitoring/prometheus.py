@@ -4,7 +4,7 @@
 from prometheus_client import CollectorRegistry, Gauge, Summary
 
 
-def set_cluster_prometheus_registry_collectors(
+def set_kafka_cluster_prometheus_registry_collectors(
     prometheus_registry: CollectorRegistry,
 ) -> dict[str, Gauge | Summary]:
     collectors: dict = {
@@ -49,6 +49,26 @@ def set_cluster_prometheus_registry_collectors(
             "consumer_group_lag",
             "Consumer group lag",
             ["cluster", "consumer_group", "topic_name"],
+            registry=prometheus_registry,
+        ),
+    }
+    return collectors
+
+
+def set_schema_registry_prometheus_registry_collectors(
+    prometheus_registry: CollectorRegistry,
+) -> dict[str, Gauge | Summary]:
+    collectors: dict = {
+        "subjects_count": Gauge(
+            "subjects_count",
+            "Total number of subjects",
+            labelnames=["schema_registry"],
+            registry=prometheus_registry,
+        ),
+        "schemas_count": Gauge(
+            "schemas_count",
+            "Total number of subjects",
+            labelnames=["schema_registry"],
             registry=prometheus_registry,
         ),
     }

@@ -15,7 +15,8 @@ from dacite import from_dict
 from prometheus_client import CollectorRegistry, multiprocess
 
 from kafka_overwatch.monitoring.prometheus import (
-    set_cluster_prometheus_registry_collectors,
+    set_kafka_cluster_prometheus_registry_collectors,
+    set_schema_registry_prometheus_registry_collectors,
 )
 from kafka_overwatch.notifications.aws_sns import SnsChannel
 from kafka_overwatch.overwatch_resources.schema_registry import SchemaRegistry
@@ -41,8 +42,11 @@ class OverwatchConfig:
         self.prometheus_registry: CollectorRegistry = CollectorRegistry(
             auto_describe=True,
         )
-        self.prometheus_collectors = set_cluster_prometheus_registry_collectors(
+        self.prometheus_collectors = set_kafka_cluster_prometheus_registry_collectors(
             self.prometheus_registry
+        )
+        self.prometheus_collectors.update(
+            set_schema_registry_prometheus_registry_collectors(self.prometheus_registry)
         )
         multiprocess.MultiProcessCollector(
             self.prometheus_registry, path=self._prometheus_registry_dir.name

@@ -8,10 +8,13 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from kafka_overwatch.overwatch_resources.schema_registry import SchemaRegistry
+    from kafka_overwatch.config.config import OverwatchConfig
 
 import pickle
 import signal
 from datetime import datetime, timedelta
+
+from prometheus_client import Gauge
 
 from kafka_overwatch.common import waiting_on_futures
 from kafka_overwatch.config.logging import KAFKA_LOG
@@ -21,6 +24,7 @@ from kafka_overwatch.overwatch_resources.schema_registry import (
     Subject,
     refresh_subject_metadata,
 )
+from kafka_overwatch.processing import ensure_prometheus_multiproc
 
 from . import FOREVER, handle_signals, stop_flag, wait_between_intervals
 
@@ -71,7 +75,7 @@ def retrieve_from_schemas(schema_registry: SchemaRegistry, schemas: list[dict]) 
     """
     Fastest way, used if /schemas worked
     """
-    KAFKA_LOG.info("Schema Registry: %s | Retrieving all schemas")
+    KAFKA_LOG.info(f"Schema Registry: {schema_registry.name} | Retrieving all schemas")
     for _schema in schemas:
         schema_subject: str = _schema["subject"]
         schema_id: int = _schema["id"]
@@ -93,9 +97,26 @@ def retrieve_from_schemas(schema_registry: SchemaRegistry, schemas: list[dict]) 
             subject.versions[schema_version] = schema
 
 
-def import_subjects(schema_registry: SchemaRegistry, runtime_key) -> None:
+def init_schema_registry_prometheus_reporting(
+    schema_registry: SchemaRegistry, overwatch_config: OverwatchConfig
+):
+    ensure_prometheus_multiproc(overwatch_config.prometheus_registry_dir.name)
+    subjects_count: Gauge = overwatch_config.prometheus_collectors["subjects_count"]
+    schemas_count: Gauge = overwatch_config.prometheus_collectors["schemas_count"]
+
+    subjects_count = subjects_count.labels(schema_registry=schema_registry.name)
+    schemas_count = schemas_count.labels(schema_registry=schema_registry.name)
+    return subjects_count, schemas_count
+
+
+def import_subjects(
+    schema_registry: SchemaRegistry, runtime_key, overwatch_config: OverwatchConfig
+) -> None:
     signal.signal(signal.SIGINT, handle_signals)
     signal.signal(signal.SIGTERM, handle_signals)
+    subjects_count, schemas_count = init_schema_registry_prometheus_reporting(
+        schema_registry, overwatch_config
+    )
     sr_client = schema_registry.get_client(runtime_key)
     while FOREVER:
         if stop_flag.is_set():
@@ -104,17 +125,40 @@ def import_subjects(schema_registry: SchemaRegistry, runtime_key) -> None:
         next_scan = now + timedelta(
             seconds=schema_registry.config.schema_registry_scan_interval
         )
-        schemas_r = sr_client.get_all_schemas()
-        if 200 <= schemas_r.status_code <= 299:
-            retrieve_from_schemas(schema_registry, schemas_r.json())
-        else:
+        try:
+            schemas_r = sr_client.get_all_schemas()
+            if 200 <= schemas_r.status_code <= 299:
+                retrieve_from_schemas(schema_registry, schemas_r.json())
+        except Exception as error:
+            KAFKA_LOG.exception(error)
+            KAFKA_LOG.error(
+                "{} Failed to retrieve schemas via /schemas".format(
+                    schema_registry.name
+                )
+            )
             retrieve_from_subjects(schema_registry, sr_client)
+        try:
+            subjects_count.set(len(schema_registry.subjects))
+            schemas_count.set(len(schema_registry.schemas))
+        except Exception as error:
+            print(error)
+            KAFKA_LOG.error(
+                "Schema registry: %s | Unable to set prometheus metrics"
+                % (schema_registry.name,)
+            )
         then = datetime.utcnow()
         delta = int((next_scan - then).total_seconds())
-        with open(schema_registry.mmap_file, "wb") as bin_fd:
-            bin_fd.write(pickle.dumps(schema_registry))
-            KAFKA_LOG.info(
-                "%s Wrote schema registry to %s"
+        try:
+            with open(schema_registry.mmap_file, "wb") as bin_fd:
+                bin_fd.write(pickle.dumps(schema_registry))
+                KAFKA_LOG.info(
+                    "%s Wrote schema registry to %s"
+                    % (schema_registry.name, schema_registry.mmap_file)
+                )
+        except Exception as error:
+            KAFKA_LOG.exception(error)
+            KAFKA_LOG.error(
+                "Schema Registry: %s | Failed to write mmap file to %s"
                 % (schema_registry.name, schema_registry.mmap_file)
             )
         if delta > 0:

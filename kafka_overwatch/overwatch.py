@@ -66,7 +66,7 @@ class KafkaOverwatchService:
             cluster_name,
             cluster,
         ) in self.kafka_clusters.items():
-            clusters_jobs.append([cluster_name, cluster, self.config])
+            clusters_jobs.append([cluster, self.config])
         self.multi_clusters_processing(clusters_jobs, sr_jobs)
 
     def multi_clusters_processing(self, clusters_jobs: list, sr_jobs: list):

@@ -76,49 +76,60 @@ def process_cluster(kafka_cluster: KafkaCluster, overwatch_config: OverwatchConf
         "consumer_group_lag"
     ]
     while FOREVER:
-        kafka_cluster.check_replace_kafka_clients()
-        kafka_cluster.set_cluster_properties()
-        print(
-            "PROCESSING LOOP - CLIENTS??",
-            hex(id(kafka_cluster._admin_client)),
-            hex(id(kafka_cluster._consumer_client)),
-        )
+        try:
+            kafka_cluster.check_replace_kafka_clients()
+            kafka_cluster.set_cluster_properties()
+            print(
+                "PROCESSING LOOP - CLIENTS??",
+                hex(id(kafka_cluster._admin_client)),
+                hex(id(kafka_cluster._consumer_client)),
+            )
 
-        processing_start = dt.utcnow()
-        if not stop_flag.is_set():
-            process_cluster_resources(kafka_cluster)
-        else:
-            break
-        topics_df = generate_cluster_topics_pd_dataframe(kafka_cluster)
-        groups_df = generate_cluster_consumer_groups_pd_dataframe(kafka_cluster)
-        kafka_cluster.cluster_topics_count.set(len(topics_df["name"].values.tolist()))
-        kafka_cluster.cluster_partitions_count.set(
-            sum(topics_df["partitions"].values.tolist())
-        )
-        kafka_cluster.cluster_consumer_groups_count.set(len(kafka_cluster.groups))
-        if (
-            kafka_cluster.config.topics_backup_config
-            and kafka_cluster.config.topics_backup_config.enabled
-        ):
-            kafka_cluster.render_restore_files()
-        elapsed_time = int((dt.utcnow() - processing_start).total_seconds())
-        KAFKA_LOG.info(f"{kafka_cluster.name} - {elapsed_time}s processing time.")
-        KAFKA_LOG.info(f"{kafka_cluster.name} - Cluster topics stats")
-        print(topics_df.describe())
-        print(groups_df.describe())
-        measure_consumer_group_lags(kafka_cluster, consumer_group_lag_gauge)
-        generate_cluster_report(kafka_cluster, topics_df, groups_df)
-        time_to_wait = int(
-            kafka_cluster.config.cluster_scan_interval_in_seconds - elapsed_time
-        )
-        wait_between_intervals(
-            time_to_wait,
-            (
-                f"{kafka_cluster.name} - interval set to {kafka_cluster.config.cluster_scan_interval_in_seconds}"
-                f", however it takes {elapsed_time}s to complete the scan. Consider changing scan interval"
-            ),
-        )
-
+            processing_start = dt.utcnow()
+            if not stop_flag.is_set():
+                process_cluster_resources(kafka_cluster)
+            else:
+                break
+            topics_df = generate_cluster_topics_pd_dataframe(kafka_cluster)
+            groups_df = generate_cluster_consumer_groups_pd_dataframe(kafka_cluster)
+            kafka_cluster.cluster_topics_count.set(
+                len(topics_df["name"].values.tolist())
+            )
+            kafka_cluster.cluster_partitions_count.set(
+                sum(topics_df["partitions"].values.tolist())
+            )
+            kafka_cluster.cluster_consumer_groups_count.set(len(kafka_cluster.groups))
+            if (
+                kafka_cluster.config.topics_backup_config
+                and kafka_cluster.config.topics_backup_config.enabled
+            ):
+                kafka_cluster.render_restore_files()
+            elapsed_time = int((dt.utcnow() - processing_start).total_seconds())
+            KAFKA_LOG.info(f"{kafka_cluster.name} - {elapsed_time}s processing time.")
+            KAFKA_LOG.info(f"{kafka_cluster.name} - Cluster topics stats")
+            print(topics_df.describe())
+            print(groups_df.describe())
+            measure_consumer_group_lags(kafka_cluster, consumer_group_lag_gauge)
+            generate_cluster_report(kafka_cluster, topics_df, groups_df)
+            time_to_wait = int(
+                kafka_cluster.config.cluster_scan_interval_in_seconds - elapsed_time
+            )
+            wait_between_intervals(
+                time_to_wait,
+                (
+                    f"{kafka_cluster.name} - interval set to {kafka_cluster.config.cluster_scan_interval_in_seconds}"
+                    f", however it takes {elapsed_time}s to complete the scan. Consider changing scan interval"
+                ),
+            )
+        except Exception as e:
+            KAFKA_LOG.exception(e)
+            KAFKA_LOG.error(f"{kafka_cluster.name} - {e}")
+            try:
+                kafka_cluster.set_cluster_connections()
+            except Exception as e:
+                KAFKA_LOG.exception(e)
+                KAFKA_LOG.error(f"{kafka_cluster.name} - {e}")
+                return
     return
 
 
@@ -134,14 +145,4 @@ def process_cluster_resources(kafka_cluster: KafkaCluster):
         for consumer_group in kafka_cluster.groups.values():
             update_set_consumer_group_topics_partitions_offsets(
                 kafka_cluster, consumer_group
-            )
-    if not stop_flag.is_set():
-        cluster_sr = kafka_cluster.get_schema_registry()
-        if cluster_sr:
-            KAFKA_LOG.info(
-                "Kafka cluster: %s | Successfully retrieved Schema Registry %s metadata"
-                % (
-                    kafka_cluster.name,
-                    cluster_sr.name,
-                )
             )

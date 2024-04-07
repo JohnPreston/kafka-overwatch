@@ -26,13 +26,7 @@ from kafka_overwatch.overwatch_resources.clusters import (
     generate_cluster_topics_pd_dataframe,
 )
 
-from . import (
-    FOREVER,
-    ensure_prometheus_multiproc,
-    handle_signals,
-    stop_flag,
-    wait_between_intervals,
-)
+from . import FOREVER, handle_signals, stop_flag, wait_between_intervals
 
 
 def measure_consumer_group_lags(

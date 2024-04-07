@@ -4,8 +4,6 @@
 from __future__ import annotations
 
 import concurrent.futures
-import os
-import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -221,7 +219,7 @@ def process_schema_registry(
             )
             schema_registry.temp_bin_dir.cleanup()
             return
-        then = datetime.utcnow()
+        then = datetime.now(timezone.utc)
         delta = int((next_scan - then).total_seconds())
         if delta > 0:
             KAFKA_LOG.info("%s - Waiting %d seconds" % (schema_registry.name, delta))

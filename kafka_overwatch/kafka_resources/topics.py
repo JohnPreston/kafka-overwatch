@@ -180,7 +180,6 @@ def describe_update_topics(kafka_cluster: KafkaCluster, desc_topics: dict) -> No
     """
     topic_jobs, topics_configs_resources = define_topic_jobs(kafka_cluster, desc_topics)
     _tasks = len(topic_jobs)
-    completed: int = 0
     with concurrent.futures.ThreadPoolExecutor(
         max_workers=kafka_cluster.cluster_brokers_count
     ) as executor:

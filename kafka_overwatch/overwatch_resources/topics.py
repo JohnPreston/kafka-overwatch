@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from datetime import datetime as dt
 from datetime import timedelta as td
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from kafka_overwatch.overwatch_resources.clusters import KafkaCluster

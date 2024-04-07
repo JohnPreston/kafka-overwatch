@@ -6,7 +6,7 @@ from __future__ import annotations
 from copy import deepcopy
 from os import environ
 
-from confluent_kafka import Consumer, KafkaError, KafkaException
+from confluent_kafka import Consumer, KafkaException
 from confluent_kafka.admin import AdminClient
 from retry import retry
 

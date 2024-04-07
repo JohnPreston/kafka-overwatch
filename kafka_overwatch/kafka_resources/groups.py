@@ -13,13 +13,11 @@ import concurrent.futures
 
 from confluent_kafka import ConsumerGroupTopicPartitions
 from confluent_kafka.error import KafkaError, KafkaException
-from retry import retry
 
 from kafka_overwatch.common import waiting_on_futures
 from kafka_overwatch.config.logging import KAFKA_LOG
 from kafka_overwatch.kafka_resources import wait_for_result
 from kafka_overwatch.overwatch_resources.groups import ConsumerGroup
-from kafka_overwatch.processing import stop_flag
 
 
 def get_consumer_groups_desc(

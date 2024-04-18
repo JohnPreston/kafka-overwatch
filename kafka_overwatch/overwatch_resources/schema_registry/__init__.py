@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import tarfile
 from typing import TYPE_CHECKING
 
@@ -91,14 +92,26 @@ class SchemaRegistry:
             return
         process_folder = TemporaryDirectory()
         schemas_folder: TemporaryDirectory = TemporaryDirectory(dir=process_folder.name)
+        subjects_index: dict = {}
         for _subject in self.subjects.values():
+            if _subject.name not in subjects_index:
+                _subject_index: dict = {}
+                subjects_index[_subject.name]: dict = _subject_index
+            else:
+                _subject_index: dict = subjects_index[_subject.name]
             for version in _subject.versions:
                 _schema: Schema = _subject.versions[version]
                 schema_file_name = f"{_subject.name}::{version}::{_schema.schema_type}::{_schema.schema_id}.txt"
+                if version not in _subject_index:
+                    _subject_index[version]: str = schema_file_name
                 with open(
                     f"{schemas_folder.name}/{schema_file_name}", "w"
                 ) as subject_version_fd:
                     subject_version_fd.write(_schema.schema_string)
+        for _subject in subjects_index:
+            subjects_index[_subject] = dict(sorted(subjects_index[_subject].items()))
+        with open(f"{schemas_folder.name}/index.json", "w") as index_fd:
+            index_fd.write(json.dumps(subjects_index, sort_keys=True))
         with tarfile.open(f"{process_folder.name}/schemas.tar.gz", "w:gz") as tar:
             tar.add(schemas_folder.name, arcname=".")
         with open(f"{process_folder.name}/schemas.tar.gz", "rb") as gz_fd:

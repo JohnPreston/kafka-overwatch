@@ -65,6 +65,7 @@ sphinx-autodoc-typehints = "^1.25.2"
 
 [tool.poetry.scripts]
 kafka-overwatch = "kafka_overwatch.cli:main"
+schema-registry-restore = "kafka_overwatch.cli.schema_registry_restore:main"
 
 [tool.black]
 line-length = 88

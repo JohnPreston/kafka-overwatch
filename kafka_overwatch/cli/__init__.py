@@ -81,13 +81,17 @@ def main():
         _overwatch_config: OverwatchConfig = OverwatchConfig(
             _config, prometheus_registry_dir
         )
+    except Exception as error:
+        print("Failed to load up the configuration", error)
+        return 2
+    try:
         watcher = KafkaOverwatchService(_overwatch_config)
         if profiler:
             profiler.start()
         watcher.start()
         return 0
     except Exception as error:
-        print(error)
+        print("Failed to start kafka-overwatch", error)
         return 1
 
 

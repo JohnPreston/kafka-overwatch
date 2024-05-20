@@ -1,0 +1,107 @@
+---
+# Override file to deploy Kafka overwatch to AWS with [ECS Compose-X](https://docs.compose-x.io)
+
+volumes:
+  overwatch_config:
+secrets:
+  kafka_nasa:
+    external: true
+    x-secrets:
+      Lookup:
+        Tags:
+          Name: kafka-nasa
+services:
+  kafka-overwatch:
+    image: public.ecr.aws/compose-x/kafka-overwatch:nightly
+    depends_on:
+      - config-bootstrap
+    volumes:
+      - overwatch_config:/_config/
+    command:
+      - -c
+      - /_config/nonprod.yaml
+    secrets:
+      - kafka_nasa
+    environment:
+      EXPORTS_BUCKET_NAME: x-s3::export-bucket::BucketName
+  config-bootstrap:
+    image: public.ecr.aws/compose-x/ecs-files-composer:latest
+    x-docker_opts:
+      InterpolateWithDigest: true
+    secrets:
+      - kafka_nasa
+    deploy:
+      labels:
+        ecs.task.family: kafka-overwatch
+        ecs.depends.condition: SUCCESS
+    volumes:
+      - overwatch_config:/_config/
+    environment:
+      EXPORTS_BUCKET_NAME: x-s3::export-bucket::BucketName
+      OVERWATCH_CONFIG: x-ssm_parameter::config::ParameterName
+    command:
+      - --context
+      - jinja2
+      - --decode-base64
+      - --from-ssm
+      - x-ssm_parameter::bootstrap-config::ParameterName
+
+
+x-s3:
+  DeletionPolicy: Retain
+  export-bucket:
+    Lookup:
+      Tags:
+        aws:cloudformation:stack-name: overwatch-s3-1I4WTK5D7A20L
+        aws:cloudformation:logical-id: exportbucket
+    MacroParameters:
+      PredefinedBucketPolicies:
+        - enforceSecureConnection
+      ExpandAccountIdToBucket: true
+      ExpandRegionToBucket: true
+    Properties:
+      AccessControl: BucketOwnerFullControl
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+      ObjectLockEnabled: true
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: false
+      VersioningConfiguration:
+        Status: Enabled
+    Services:
+      kafka-overwatch:
+        Access:
+          bucket: ListOnly
+          objects: CRUD
+
+x-ssm_parameter:
+  bootstrap-config:
+    Properties:
+      DataType: text
+      Type: String
+      Tier: Intelligent-Tiering
+    MacroParameters:
+      FromFile: compose_x/bootstrap.yaml
+      EncodeToBase64: true
+      ValidateYaml: true
+    Services:
+      config-bootstrap:
+        Access: RO
+
+  config:
+    Properties:
+      DataType: text
+      Type: String
+      Tier: Intelligent-Tiering
+    MacroParameters:
+      FromFile: compose_x/nonprod.config.yaml
+      EncodeToBase64: true
+      ValidateYaml: true
+    Services:
+      config-bootstrap:
+        Access: RO

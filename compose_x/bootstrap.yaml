@@ -1,0 +1,10 @@
+---
+# bootstrap for ecs-files-composer
+
+files:
+  /_config/nonprod.yaml:
+    context: jinja2
+    encoding: base64
+    source:
+      Ssm:
+        ParameterName: "{{ env_var('OVERWATCH_CONFIG') | safe }}"

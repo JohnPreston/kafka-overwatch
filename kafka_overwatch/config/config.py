@@ -71,6 +71,8 @@ class OverwatchConfig:
 
     def init_schema_registries(self):
         """Initializes the Schema Registries client if setup in the configuration"""
+        if not self.input_config.schema_registries:
+            return
         for registry_name, registry in self.input_config.schema_registries.items():
             _registry = SchemaRegistry(registry_name, registry, self.runtime_key)
             self.schema_registries[registry_name] = _registry

@@ -3,7 +3,9 @@
 
 services:
   kafka-overwatch:
-    image: public.ecr.aws/johnpreston/kafka-overwatch
+    image: public.ecr.aws/compose-x/kafka-overwatch:${IMAGE_TAG:-latest}
+    x-docker_opts:
+      InterpolateWithDigest: true
     build:
       context: .
     ports:

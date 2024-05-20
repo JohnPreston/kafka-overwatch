@@ -50,6 +50,13 @@ Configuration
 Whilst a much more comprehensive documentation is yet to be written, please look at ``kafka_overwatch/specs/config.json``
 which is used with `jsonschema`_ to perform validation of the input.
 
+Return codes
+=============
+
+0 - all successful.
+1 - error during execution
+2 - error importing configuration.
+
 Misc
 =====
 

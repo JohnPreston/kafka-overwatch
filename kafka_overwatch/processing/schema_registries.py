@@ -31,7 +31,9 @@ from kafka_overwatch.processing import ensure_prometheus_multiproc
 from . import wait_between_intervals
 
 
-def retrieve_from_subjects(schema_registry: SchemaRegistry, sr_client) -> None:
+def retrieve_from_subjects(
+    schema_registry: SchemaRegistry, sr_client, stop_flag
+) -> None:
     """
     Much longer way to retrieve all the schemas & subjects, using the subjects endpoints.
     Using threading to speed up the processing, but still slower by an order of magnitude
@@ -70,6 +72,7 @@ def retrieve_from_subjects(schema_registry: SchemaRegistry, sr_client) -> None:
             "Schema Registry",
             schema_registry.name,
             "Subjects",
+            stop_flag,
         )
 
 
@@ -125,7 +128,7 @@ def init_schema_registry_prometheus_reporting(
     return subjects_count, schemas_count
 
 
-def process_schemas(schema_registry: SchemaRegistry, sr_client) -> None:
+def process_schemas(schema_registry: SchemaRegistry, sr_client, stop_flag) -> None:
     """
     Process all schemas in the schema registry.
     If getting schemas from /schemas fails, fall back to /subjects
@@ -137,7 +140,7 @@ def process_schemas(schema_registry: SchemaRegistry, sr_client) -> None:
         KAFKA_LOG.error(
             f"{schema_registry.name} Failed to retrieve schemas via /schemas"
         )
-        retrieve_from_subjects(schema_registry, sr_client)
+        retrieve_from_subjects(schema_registry, sr_client, stop_flag)
 
 
 def set_prometheus_metrics(
@@ -205,7 +208,7 @@ def process_schema_registry(
             seconds=schema_registry.config.schema_registry_scan_interval
         )
         try:
-            process_schemas(schema_registry, sr_client)
+            process_schemas(schema_registry, sr_client, stop_flag)
             set_prometheus_metrics(subjects_count, schemas_count, schema_registry)
             backup_schema_registry_subjects(schema_registry)
             write_schema_registry_mmap(schema_registry)

@@ -25,37 +25,6 @@ from kafka_overwatch.kafka_resources import wait_for_result
 from kafka_overwatch.overwatch_resources.topics import Partition, Topic
 
 
-def get_filtered_topics_list(cluster: KafkaCluster) -> list[str]:
-    """
-    Lists all topics, returns them based on include and exclude regex.
-    """
-    if not cluster.topics:
-        describe_update_all_topics(cluster)
-    topics_list = list(cluster.topics.keys())
-    final_list: list[str] = []
-    if (
-        not cluster.config.topic_include_regexes
-        or not cluster.config.topic_exclude_regexes
-    ):
-        return topics_list
-    for regex in cluster.config.topic_exclude_regexes:
-        try:
-            topics_list = [topic for topic in topics_list if not re.match(regex, topic)]
-        except Exception as error:
-            KAFKA_LOG.exception(error)
-            KAFKA_LOG.error(f"Failed to parse exclude_regex with regex {regex}")
-
-    for regex in cluster.config.topic_include_regexes:
-        try:
-            for topic in topics_list:
-                if re.match(regex, topic):
-                    final_list.append(topic)
-        except Exception as error:
-            KAFKA_LOG.error(f"Failed to parse include_regex with regex {regex}")
-
-    return final_list
-
-
 @retry((KafkaException,), tries=5)
 def get_topic_descriptions(
     topic_names: list[str], admin_client

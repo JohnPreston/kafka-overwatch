@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -10,12 +11,20 @@ if TYPE_CHECKING:
 
 import concurrent.futures
 import signal
+from multiprocessing import Event, Manager
 
 from kafka_overwatch.config.logging import KAFKA_LOG
 from kafka_overwatch.overwatch_resources.clusters import KafkaCluster
-from kafka_overwatch.processing import handle_signals, stop_flag
 from kafka_overwatch.processing.clusters import process_cluster
 from kafka_overwatch.processing.schema_registries import process_schema_registry
+
+STOP_FLAG = Event()
+
+
+def handle_signals(pid, frame, stop_flag):
+    print("Cluster processing received signal to stop", pid, frame)
+    stop_flag["stop"] = True
+    STOP_FLAG.set()
 
 
 class KafkaOverwatchService:
@@ -32,8 +41,6 @@ class KafkaOverwatchService:
     def __init__(self, config: OverwatchConfig) -> None:
         self._config = config
         self.kafka_clusters: dict[str, KafkaCluster] = {}
-        signal.signal(signal.SIGINT, handle_signals)
-        signal.signal(signal.SIGTERM, handle_signals)
 
     @property
     def config(self) -> OverwatchConfig:
@@ -52,6 +59,19 @@ class KafkaOverwatchService:
         KAFKA_LOG.info("Starting Kafka Overwatch")
         self.init_system()
         clusters_jobs = []
+        manager = Manager()
+        stop_flag = manager.dict()
+        stop_flag["stop"] = False
+
+        signal.signal(
+            signal.SIGTERM,
+            lambda signum, frame: handle_signals(signum, frame, stop_flag),
+        )
+        signal.signal(
+            signal.SIGINT,
+            lambda signum, frame: handle_signals(signum, frame, stop_flag),
+        )
+
         self.kafka_clusters.update(
             {
                 name: KafkaCluster(name, config, self.config)
@@ -59,17 +79,18 @@ class KafkaOverwatchService:
             }
         )
         sr_jobs: list = [
-            [_sr, self.config.runtime_key, self.config]
+            [_sr, self.config.runtime_key, self.config, stop_flag]
             for _sr in self.config.schema_registries.values()
         ]
         for (
             cluster_name,
             cluster,
         ) in self.kafka_clusters.items():
-            clusters_jobs.append([cluster, self.config])
+            clusters_jobs.append([cluster, self.config, stop_flag])
         self.multi_clusters_processing(clusters_jobs, sr_jobs)
 
-    def multi_clusters_processing(self, clusters_jobs: list, sr_jobs: list):
+    @staticmethod
+    def multi_clusters_processing(clusters_jobs: list, sr_jobs: list):
         with concurrent.futures.ProcessPoolExecutor(
             max_workers=(len(clusters_jobs) + len(sr_jobs))
         ) as executor:
@@ -88,10 +109,14 @@ class KafkaOverwatchService:
                 }
             )
             try:
-                while not stop_flag.is_set():
+                while not STOP_FLAG.is_set():
                     concurrent.futures.wait(futures_to_data, timeout=10)
+                else:
+                    print("Done, let's go")
+                    executor.shutdown(wait=False, cancel_futures=True)
             except KeyboardInterrupt:
-                for _future in futures_to_data:
-                    _future.cancel()
                 executor.shutdown(wait=True, cancel_futures=True)
+            finally:
+                executor.shutdown(wait=True, cancel_futures=True)
+                print("Executor has been shut down")
         return

@@ -10,8 +10,10 @@ if TYPE_CHECKING:
 
 import concurrent
 
+from compose_x_common.compose_x_common import keyisset
+
 from kafka_overwatch.config.logging import KAFKA_LOG
-from kafka_overwatch.processing import stop_flag
+from kafka_overwatch.processing.signals import STOP_FLAG
 
 
 def waiting_on_futures(
@@ -20,6 +22,7 @@ def waiting_on_futures(
     resource_type: str,
     resource_name: str,
     scan_type: str,
+    stop_flag: dict,
 ):
     _pending = len(futures_to_data)
     KAFKA_LOG.debug(
@@ -28,7 +31,7 @@ def waiting_on_futures(
         )
     )
     while _pending > 0:
-        if stop_flag.is_set():
+        if STOP_FLAG.is_set() or stop_flag["stop"] is True:
             for _future in futures_to_data:
                 _future.cancel()
             executor.shutdown(wait=False, cancel_futures=True)

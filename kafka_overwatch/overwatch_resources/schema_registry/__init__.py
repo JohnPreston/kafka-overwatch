@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from .subject import Subject
     from .schema import Schema
 
+from datetime import datetime as dt
 from tempfile import TemporaryDirectory
 
 from cryptography.fernet import Fernet
@@ -63,10 +64,6 @@ class SchemaRegistry:
         """Kafka clusters this schema registry is linked to"""
         self.kafka_clusters: dict[str, KafkaCluster] = {}
         self._config = registry_config
-        self.s3_backup_handler: S3Handler | None = None
-        if self.config.backup_config and self.config.backup_config.enabled:
-            self.s3_backup_handler = S3Handler(self.config.backup_config.S3)
-
         self.supported_types = ["JSON", "PROTOBUF", "AVRO"]
 
     @property
@@ -75,6 +72,14 @@ class SchemaRegistry:
 
     def __repr__(self):
         return self.name
+
+    def init_backup_handler(self) -> S3Handler:
+        if (
+            self.config.backup_config
+            and self.config.backup_config.S3
+            and self.config.backup_config.enabled
+        ):
+            return S3Handler(self.config.backup_config.S3)
 
     def get_client(self, runtime_key) -> SchemaRegistryClient | None:
         if self.basic_auth:
@@ -87,8 +92,8 @@ class SchemaRegistry:
                 **kwargs,
             )
 
-    def backup(self):
-        if not self.s3_backup_handler:
+    def backup(self, s3_backup_handler: S3Handler | None):
+        if not s3_backup_handler:
             return
         process_folder = TemporaryDirectory()
         schemas_folder: TemporaryDirectory = TemporaryDirectory(dir=process_folder.name)
@@ -115,9 +120,9 @@ class SchemaRegistry:
         with tarfile.open(f"{process_folder.name}/schemas.tar.gz", "w:gz") as tar:
             tar.add(schemas_folder.name, arcname=".")
         with open(f"{process_folder.name}/schemas.tar.gz", "rb") as gz_fd:
-            self.s3_backup_handler.upload(
+            s3_backup_handler.upload(
                 body=gz_fd.read(),
-                file_name="schemas.tar.gz",
+                file_name=f'{self.name}/{dt.now().strftime("%Y/%m/%d/%H_%M")}/schemas.tar.gz',
                 mime_type="application/gzip",
             )
         schemas_folder.cleanup()

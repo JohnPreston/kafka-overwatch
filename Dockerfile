@@ -15,6 +15,7 @@ RUN poetry build
 
 
 FROM $BASE_IMAGE
+COPY --from=ghcr.io/fivexl/lprobe /lprobe /bin/lprobe
 COPY --from=builder /opt/dist/kafka_overwatch-*.whl /opt/kafka-overwatch/
 WORKDIR /opt/kafka-overwatch/
 

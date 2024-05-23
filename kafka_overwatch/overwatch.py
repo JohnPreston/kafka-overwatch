@@ -46,18 +46,18 @@ class KafkaOverwatchService:
     def config(self) -> OverwatchConfig:
         return self._config
 
-    def init_system(self):
+    def init_prometheus(self):
         """
         Import prometheus_client.start_http_server at the latest point to make sure the
         multiprocess folder env var is taken into account.
         """
         from prometheus_client import start_http_server
 
-        start_http_server(8000, registry=self.config.prometheus_registry)
+        return start_http_server(8000, registry=self.config.prometheus_registry)
 
     def start(self):
         KAFKA_LOG.info("Starting Kafka Overwatch")
-        self.init_system()
+        httpd, thread = self.init_prometheus()
         clusters_jobs = []
         manager = Manager()
         stop_flag = manager.dict()
@@ -87,10 +87,10 @@ class KafkaOverwatchService:
             cluster,
         ) in self.kafka_clusters.items():
             clusters_jobs.append([cluster, self.config, stop_flag])
-        self.multi_clusters_processing(clusters_jobs, sr_jobs)
+        self.multi_clusters_processing(clusters_jobs, sr_jobs, httpd)
 
     @staticmethod
-    def multi_clusters_processing(clusters_jobs: list, sr_jobs: list):
+    def multi_clusters_processing(clusters_jobs: list, sr_jobs: list, httpd):
         with concurrent.futures.ProcessPoolExecutor(
             max_workers=(len(clusters_jobs) + len(sr_jobs))
         ) as executor:
@@ -111,12 +111,10 @@ class KafkaOverwatchService:
             try:
                 while not STOP_FLAG.is_set():
                     concurrent.futures.wait(futures_to_data, timeout=10)
-                else:
-                    print("Done, let's go")
-                    executor.shutdown(wait=False, cancel_futures=True)
             except KeyboardInterrupt:
                 executor.shutdown(wait=True, cancel_futures=True)
             finally:
                 executor.shutdown(wait=True, cancel_futures=True)
                 print("Executor has been shut down")
+                httpd.shutdown()
         return

@@ -237,3 +237,6 @@ def process_schema_registry(
                     (then - now).total_seconds(),
                 )
             )
+
+
+2

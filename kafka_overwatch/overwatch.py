@@ -57,7 +57,7 @@ class KafkaOverwatchService:
 
     def start(self):
         KAFKA_LOG.info("Starting Kafka Overwatch")
-        httpd, thread = self.init_prometheus()
+        httpd, _ = self.init_prometheus()
         clusters_jobs = []
         manager = Manager()
         stop_flag = manager.dict()

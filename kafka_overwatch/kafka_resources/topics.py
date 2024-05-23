@@ -13,6 +13,7 @@ import concurrent.futures
 import re
 from datetime import datetime as dt
 
+from compose_x_common.compose_x_common import keyisset
 from confluent_kafka import TopicCollection, TopicPartition
 from confluent_kafka.admin import AclOperation, ConfigResource, ResourceType
 from confluent_kafka.error import KafkaException
@@ -22,37 +23,6 @@ from kafka_overwatch.common import waiting_on_futures
 from kafka_overwatch.config.logging import KAFKA_LOG
 from kafka_overwatch.kafka_resources import wait_for_result
 from kafka_overwatch.overwatch_resources.topics import Partition, Topic
-
-
-def get_filtered_topics_list(cluster: KafkaCluster) -> list[str]:
-    """
-    Lists all topics, returns them based on include and exclude regex.
-    """
-    if not cluster.topics:
-        describe_update_all_topics(cluster)
-    topics_list = list(cluster.topics.keys())
-    final_list: list[str] = []
-    if (
-        not cluster.config.topic_include_regexes
-        or not cluster.config.topic_exclude_regexes
-    ):
-        return topics_list
-    for regex in cluster.config.topic_exclude_regexes:
-        try:
-            topics_list = [topic for topic in topics_list if not re.match(regex, topic)]
-        except Exception as error:
-            KAFKA_LOG.exception(error)
-            KAFKA_LOG.error(f"Failed to parse exclude_regex with regex {regex}")
-
-    for regex in cluster.config.topic_include_regexes:
-        try:
-            for topic in topics_list:
-                if re.match(regex, topic):
-                    final_list.append(topic)
-        except Exception as error:
-            KAFKA_LOG.error(f"Failed to parse include_regex with regex {regex}")
-
-    return final_list
 
 
 @retry((KafkaException,), tries=5)
@@ -83,9 +53,7 @@ def get_topics_list(kafka_cluster: KafkaCluster) -> list[str]:
         raise
 
 
-def describe_update_all_topics(
-    kafka_cluster: KafkaCluster,
-) -> None:
+def describe_update_all_topics(kafka_cluster: KafkaCluster, stop_flag: dict) -> None:
     """
     Lists all topics
     """
@@ -103,20 +71,10 @@ def describe_update_all_topics(
                 _partition.cleanup()
             del kafka_cluster.topics[_cluster_topic_name]
 
-    if desc_topics:
-        describe_update_topics(kafka_cluster, desc_topics)
+    if desc_topics and not keyisset("stop", stop_flag):
+        describe_update_topics(kafka_cluster, desc_topics, stop_flag)
     else:
         KAFKA_LOG.info(f"No topics matched for {kafka_cluster.name}")
-
-
-def retry_kafka(future, futures_to_data, executor):
-    # get the associated data for the task
-    data = futures_to_data[future]
-    # submit the task again
-    _retry = executor.submit(init_set_partitions, data)
-    # store so we can track the retries
-    futures_to_data[_retry] = data
-    return data
 
 
 def update_set_topic_config(kafka_cluster, topics_configs_resources) -> None:
@@ -173,7 +131,9 @@ def define_topic_jobs(
     return topic_jobs, topics_configs_resources
 
 
-def describe_update_topics(kafka_cluster: KafkaCluster, desc_topics: dict) -> None:
+def describe_update_topics(
+    kafka_cluster: KafkaCluster, desc_topics: dict, stop_flag
+) -> None:
     """
     Leverages threads to retrieve the topic offset watermarks which cannot be sent in a single
     call to Kafka.
@@ -199,6 +159,7 @@ def describe_update_topics(kafka_cluster: KafkaCluster, desc_topics: dict) -> No
             "Kafka Cluster",
             kafka_cluster.name,
             "Topics",
+            stop_flag,
         )
 
     update_set_topic_config(kafka_cluster, topics_configs_resources)

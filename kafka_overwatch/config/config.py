@@ -42,15 +42,22 @@ class OverwatchConfig:
         self.prometheus_registry: CollectorRegistry = CollectorRegistry(
             auto_describe=True,
         )
-        self.prometheus_collectors = set_kafka_cluster_prometheus_registry_collectors(
-            self.prometheus_registry
-        )
-        self.prometheus_collectors.update(
-            set_schema_registry_prometheus_registry_collectors(self.prometheus_registry)
-        )
-        multiprocess.MultiProcessCollector(
-            self.prometheus_registry, path=self._prometheus_registry_dir.name
-        )
+        try:
+            self.prometheus_collectors = (
+                set_kafka_cluster_prometheus_registry_collectors(
+                    self.prometheus_registry
+                )
+            )
+            self.prometheus_collectors.update(
+                set_schema_registry_prometheus_registry_collectors(
+                    self.prometheus_registry
+                )
+            )
+            multiprocess.MultiProcessCollector(
+                self.prometheus_registry, path=self._prometheus_registry_dir.name
+            )
+        except Exception as error:
+            print("Error with prometheus_registry", error)
         self.runtime_key = Fernet.generate_key()
         self.sns_channels: dict[str, SnsChannel] = {}
         self.schema_registries: dict[str, SchemaRegistry] = {}

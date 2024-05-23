@@ -109,7 +109,7 @@ def set_update_filter_cluster_consumer_groups(kafka_cluster: KafkaCluster) -> No
 
 
 def set_update_cluster_consumer_groups(
-    kafka_cluster: KafkaCluster,
+    kafka_cluster: KafkaCluster, stop_flag: dict
 ) -> None:
     """
     Lists all Consumer Groups
@@ -142,6 +142,7 @@ def set_update_cluster_consumer_groups(
             "Kafka Cluster",
             kafka_cluster.name,
             "Consumer groups",
+            stop_flag,
         )
 
 

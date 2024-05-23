@@ -10,9 +10,10 @@ if TYPE_CHECKING:
     from prometheus_client import Gauge
     from kafka_overwatch.config.config import OverwatchConfig
 
-import signal
 from datetime import datetime as dt
 from datetime import timedelta as td
+
+from compose_x_common.compose_x_common import keyisset
 
 from kafka_overwatch.config.logging import KAFKA_LOG
 from kafka_overwatch.kafka_resources.groups import (
@@ -26,7 +27,7 @@ from kafka_overwatch.overwatch_resources.clusters import (
     generate_cluster_topics_pd_dataframe,
 )
 
-from . import FOREVER, handle_signals, stop_flag, wait_between_intervals
+from . import wait_between_intervals
 
 
 def measure_consumer_group_lags(
@@ -62,32 +63,29 @@ def generate_cluster_report(
         )
 
 
-def process_cluster(kafka_cluster: KafkaCluster, overwatch_config: OverwatchConfig):
+def process_cluster(
+    kafka_cluster: KafkaCluster, overwatch_config: OverwatchConfig, stop_flag
+):
     """
     Initialize the Kafka cluster monitoring/evaluation loop.
     Creates the cluster, which creates the Kafka clients.
     """
-    signal.signal(signal.SIGINT, handle_signals)
-    signal.signal(signal.SIGTERM, handle_signals)
     kafka_cluster.init_cluster_prometheus_reporting(overwatch_config)
     kafka_cluster.set_reporting_exporters()
     kafka_cluster.set_cluster_connections()
     consumer_group_lag_gauge = overwatch_config.prometheus_collectors[
         "consumer_group_lag"
     ]
-    while FOREVER:
+    print(stop_flag["stop"] is False)
+    while stop_flag["stop"] is False:
+        print("Cluster loop", stop_flag)
         try:
             kafka_cluster.check_replace_kafka_clients()
             kafka_cluster.set_cluster_properties()
-            print(
-                "PROCESSING LOOP - CLIENTS??",
-                hex(id(kafka_cluster._admin_client)),
-                hex(id(kafka_cluster._consumer_client)),
-            )
 
             processing_start = dt.utcnow()
-            if not stop_flag.is_set():
-                process_cluster_resources(kafka_cluster)
+            if not keyisset("stop", stop_flag):
+                process_cluster_resources(kafka_cluster, stop_flag)
             else:
                 break
             topics_df = generate_cluster_topics_pd_dataframe(kafka_cluster)
@@ -115,6 +113,7 @@ def process_cluster(kafka_cluster: KafkaCluster, overwatch_config: OverwatchConf
                 kafka_cluster.config.cluster_scan_interval_in_seconds - elapsed_time
             )
             wait_between_intervals(
+                stop_flag,
                 time_to_wait,
                 (
                     f"{kafka_cluster.name} - interval set to {kafka_cluster.config.cluster_scan_interval_in_seconds}"
@@ -133,15 +132,15 @@ def process_cluster(kafka_cluster: KafkaCluster, overwatch_config: OverwatchConf
     return
 
 
-def process_cluster_resources(kafka_cluster: KafkaCluster):
+def process_cluster_resources(kafka_cluster: KafkaCluster, stop_flag):
     """Makes sure that no signal was received in between each instruction"""
-    if not stop_flag.is_set():
+    if stop_flag["stop"] is False:
         with kafka_cluster.groups_describe_latency.time():
-            set_update_cluster_consumer_groups(kafka_cluster)
-    if not stop_flag.is_set():
+            set_update_cluster_consumer_groups(kafka_cluster, stop_flag)
+    if stop_flag["stop"] is False:
         with kafka_cluster.topics_describe_latency.time():
-            describe_update_all_topics(kafka_cluster)
-    if not stop_flag.is_set():
+            describe_update_all_topics(kafka_cluster, stop_flag)
+    if stop_flag["stop"] is False:
         for consumer_group in kafka_cluster.groups.values():
             update_set_consumer_group_topics_partitions_offsets(
                 kafka_cluster, consumer_group

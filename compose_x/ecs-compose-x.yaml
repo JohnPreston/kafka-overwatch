@@ -13,7 +13,13 @@ secrets:
 services:
   kafka-overwatch:
     image: public.ecr.aws/compose-x/kafka-overwatch:nightly
-    depends_on:
+    healthcheck:
+      test: lprobe -port=8000 -endpoint=/
+      interval: 10s
+      retries: 3
+      timeout: 10
+      start_period: 30
+      depends_on:
       - config-bootstrap
     volumes:
       - overwatch_config:/_config/

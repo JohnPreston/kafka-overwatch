@@ -33,7 +33,6 @@ from kafka_overwatch.aws_helpers.kafka_client_secrets import eval_kafka_client_c
 from kafka_overwatch.aws_helpers.s3 import S3Handler
 from kafka_overwatch.config.logging import KAFKA_LOG
 from kafka_overwatch.kafka_resources import set_admin_client, set_consumer_client
-from kafka_overwatch.kafka_resources.topics import get_filtered_topics_list
 from kafka_overwatch.overwatch_resources.schema_registry import SchemaRegistry
 from kafka_overwatch.processing import ensure_prometheus_multiproc
 from kafka_overwatch.specs.config import (
@@ -205,15 +204,6 @@ class KafkaCluster:
             return self._prometheus_collectors
         else:
             return self._overwatch_config.prometheus_collectors
-
-    @property
-    def monitored_topics(self) -> dict[str, Topic]:
-        matching_topic_names = get_filtered_topics_list(self)
-        return {
-            topic_name: topic
-            for topic_name, topic in self.topics.items()
-            if topic_name in matching_topic_names
-        }
 
     @retry((KafkaException,), tries=5, logger=KAFKA_LOG)
     def set_cluster_connections(self) -> None:

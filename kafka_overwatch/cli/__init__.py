@@ -38,7 +38,11 @@ def profiling_setup() -> Profiler | None:
         _watcher_session = Session()
         try:
             profiler = Profiler(
-                "overwatch", aws_session=_watcher_session, region_name="eu-west-1"
+                environ.get("AWS_CODEGURU_PROFILER_GROUP_NAME", "overwatch"),
+                aws_session=_watcher_session,
+                region_name=environ.get(
+                    "AWS_CODEGURU_PROFILER_TARGET_REGION", "eu-west-1"
+                ),
             )
             return profiler
         except Exception as error:

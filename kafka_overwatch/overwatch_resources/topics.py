@@ -164,7 +164,7 @@ class Topic:
                 _p.total_messages_count for _p in self.partitions.values()
             ),
             "new_messages": new_messages,
-            "eval_elapsed_time": elapsed_time.total_seconds(),
+            "eval_elapsed_time": elapsed_time,
             "consumer_groups": len(self.consumer_groups),
             "active_groups": len(
                 [_cg for _cg in self.consumer_groups.values() if _cg.is_active]
@@ -203,11 +203,14 @@ class Topic:
             [_partition.has_new_messages() for _partition in self.partitions.values()]
         )
 
-    def new_messages_count(self) -> tuple[int, td]:
+    def new_messages_count(self) -> tuple[int, int]:
         total_messages: int = 0
+        if not self.partitions:
+            return 0, 0
         elapsed_time = (
             self.partitions[0].end_offset[1] - self.partitions[0].init_start_offset[1]
         )
+
         for partition in self.partitions.values():
             total_messages += partition.get_end_offset_diff()[0]
-        return total_messages, elapsed_time
+        return total_messages, int(elapsed_time.total_seconds())

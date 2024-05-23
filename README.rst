@@ -31,11 +31,14 @@ Features
     * Number of new messages (measured with topic offsets)
 
 * AWS Secret integration for client config values
+* Schema Registry integration
+
+    * Scan schema registries, map 1 to  many kafka clusters
+    * Backup of the schemas, and CLI to restore schemas to existing/new registry.
 
 Upcoming
 ----------
 
-* Schema Registry integration
 * Multi-nodes awareness (split the load with multiple nodes)
 * `cfn-kafka-admin`_ output format
 * topic messages meta-data analysis (i.e are messages compressed?)

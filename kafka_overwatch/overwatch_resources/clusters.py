@@ -157,10 +157,14 @@ class KafkaCluster:
         else:
             if replace_consumer:
                 client_config = eval_kafka_client_config(self)
-                self._consumer_client: Consumer = set_consumer_client(client_config)
+                self._consumer_client: Consumer = set_consumer_client(
+                    client_config, self.name
+                )
             if replace_admin:
                 client_config = eval_kafka_client_config(self)
-                self._admin_client: AdminClient = set_admin_client(client_config)
+                self._admin_client: AdminClient = set_admin_client(
+                    client_config, self.name
+                )
 
     def get_schema_registry(self) -> SchemaRegistry | None:
         """
@@ -195,7 +199,9 @@ class KafkaCluster:
         except RuntimeError:
             KAFKA_LOG.warning("Consumer client was closed. Creating new one.")
             client_config = eval_kafka_client_config(self)
-            self._consumer_client: Consumer = set_consumer_client(client_config)
+            self._consumer_client: Consumer = set_consumer_client(
+                client_config, self.name
+            )
         return self._consumer_client
 
     @property
@@ -208,8 +214,8 @@ class KafkaCluster:
     @retry((KafkaException,), tries=5, logger=KAFKA_LOG)
     def set_cluster_connections(self) -> None:
         client_config = eval_kafka_client_config(self)
-        self._admin_client: AdminClient = set_admin_client(client_config)
-        self._consumer_client: Consumer = set_consumer_client(client_config)
+        self._admin_client: AdminClient = set_admin_client(client_config, self.name)
+        self._consumer_client: Consumer = set_consumer_client(client_config, self.name)
 
     @retry((KafkaException,), tries=2, logger=KAFKA_LOG)
     def set_cluster_properties(self) -> None:

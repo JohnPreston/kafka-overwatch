@@ -16,6 +16,7 @@ from datetime import timedelta as td
 from compose_x_common.compose_x_common import keyisset
 
 from kafka_overwatch.config.logging import KAFKA_LOG
+from kafka_overwatch.kafka_resources.acls import retrieve_all_acls
 from kafka_overwatch.kafka_resources.groups import (
     set_update_cluster_consumer_groups,
     update_set_consumer_group_topics_partitions_offsets,
@@ -134,6 +135,7 @@ def process_cluster(
 
 def process_cluster_resources(kafka_cluster: KafkaCluster, stop_flag):
     """Makes sure that no signal was received in between each instruction"""
+    retrieve_all_acls(kafka_cluster.get_admin_client())
     if stop_flag["stop"] is False:
         with kafka_cluster.groups_describe_latency.time():
             set_update_cluster_consumer_groups(kafka_cluster, stop_flag)

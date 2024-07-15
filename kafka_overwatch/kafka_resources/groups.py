@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
 import concurrent.futures
 
+from compose_x_common.compose_x_common import chunked_iterable
 from confluent_kafka import ConsumerGroupTopicPartitions
 from confluent_kafka.error import KafkaError, KafkaException
 
@@ -29,6 +30,7 @@ def get_consumer_groups_desc(
         groups_desc: dict[str, ConsumerGroupDescription] = {}
 
     groups_to_describe: list[str] = [_group for _group in groups_list]
+    KAFKA_LOG.info(f"Describing {len(groups_to_describe)} CGs on {kafka_cluster.name}")
     groups_desc_r: dict[str, concurrent.futures.Future] = (
         kafka_cluster.get_admin_client().describe_consumer_groups(groups_to_describe)
     )
@@ -92,7 +94,9 @@ def set_update_filter_cluster_consumer_groups(kafka_cluster: KafkaCluster) -> No
         return
     tidy_consumer_groups(kafka_cluster, query_groups_list)
 
-    groups_desc = get_consumer_groups_desc(kafka_cluster, query_groups_list)
+    groups_desc: dict = {}
+    for group_chunk in chunked_iterable(query_groups_list, 100):
+        groups_desc.update(get_consumer_groups_desc(kafka_cluster, group_chunk))
 
     for group_desc in groups_desc.values():
         if group_desc.group_id not in kafka_cluster.groups:
@@ -135,7 +139,10 @@ def set_update_cluster_consumer_groups(
             for job_params in groups_jobs.values()
         }
         _pending = len(futures_to_data)
-        KAFKA_LOG.info(f"Kafka cluster: {kafka_cluster.name} | CGs to scan: {_pending}")
+        KAFKA_LOG.info(
+            f"Kafka cluster: {kafka_cluster.name} "
+            f"| CGs to scan offsets for: {_pending}"
+        )
         waiting_on_futures(
             executor,
             futures_to_data,
@@ -144,6 +151,7 @@ def set_update_cluster_consumer_groups(
             "Consumer groups",
             stop_flag,
         )
+    KAFKA_LOG.info(f"Kafka cluster: {kafka_cluster.name} - Completed CGs offsets scan.")
 
 
 def describe_update_consumer_group_offsets(

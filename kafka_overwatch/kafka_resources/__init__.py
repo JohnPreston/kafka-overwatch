@@ -19,24 +19,36 @@ def wait_for_result(result_container: dict) -> dict:
     return result_container
 
 
-def set_consumer_client(settings: dict) -> Consumer:
+def set_consumer_client(settings: dict, cluster_name: str) -> Consumer:
     """Creates a new librdkafka Consumer client"""
-    client_id: str = f"consumer_partitions_hunter"
+    client_id: str = environ.get(
+        f"{cluster_name.upper()}_CLIENT_ID", f"consumer-kafka-overwatch_{cluster_name}"
+    )
     cluster_config = deepcopy(settings)
-    cluster_config.update({"client.id": client_id})
+    if not "client.id" in cluster_config:
+        cluster_config.update({"client.id": client_id})
     if "group.id" not in cluster_config:
         cluster_config["group.id"] = environ.get(
-            "CONSUMER_GROUP_ID", "kafka-partitions-hunter"
+            f"{cluster_name.upper()}_GROUP_ID", "kafka-overwatch"
         )
     return Consumer(cluster_config)
 
 
-def set_admin_client(settings: dict) -> AdminClient:
-    """Creates a new librdkafka Admin client"""
-    client_id: str = f"admin_partitions_hunter"
-    timeout_ms_env = int(environ.get("ADMIN_REQUEST_TIMEOUT_MS", 60000))
+def set_admin_client(settings: dict, cluster_name: str) -> AdminClient:
+    """
+    Creates a new librdkafka Admin client
+    Removes `group.id` if set
+    Request timeout from env var only taken into account if >> 60000 ms
+    """
+    client_id: str = environ.get(
+        f"{cluster_name.upper()}_CLIENT_ID", f"admin-kafka-overwatch_{cluster_name}"
+    )
+    timeout_ms_env = int(
+        environ.get(f"{cluster_name.upper()}_REQUEST_TIMEOUT_MS", 60000)
+    )
     cluster_config = deepcopy(settings)
-    cluster_config.update({"client.id": client_id})
+    if "client.id" not in cluster_config:
+        cluster_config.update({"client.id": client_id})
     if "group.id" in cluster_config:
         del cluster_config["group.id"]
     cluster_config.update(

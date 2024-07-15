@@ -38,7 +38,8 @@ def retrieve_all_acls(admin_client: AdminClient):
             pass
         for acl in acls.result():
             print(
-                f"Resource: {acl.resource_pattern_type}, "
+                f"ResourcePattern: {acl.resource_pattern_type}, "
+                f"ResourceType: {acl.restype}, "
                 f"Principal: {acl.principal}, "
                 f"Host: {acl.host}, "
                 f"Operation: {acl.operation}, "

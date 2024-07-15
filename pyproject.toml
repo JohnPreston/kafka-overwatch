@@ -28,7 +28,7 @@ exclude = ["*.pyc", "*~", "*pycache*"]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-confluent-kafka = "^2.3.0"
+confluent-kafka = "^2.4"
 compose-x-common = "^1.4"
 boto3 = ">=1.26,<2.0"
 dacite = "^1.8.1"

@@ -199,7 +199,9 @@ class KafkaCluster:
         except RuntimeError:
             KAFKA_LOG.warning("Consumer client was closed. Creating new one.")
             client_config = eval_kafka_client_config(self)
-            self._consumer_client: Consumer = set_consumer_client(client_config)
+            self._consumer_client: Consumer = set_consumer_client(
+                client_config, self.name
+            )
         return self._consumer_client
 
     @property
